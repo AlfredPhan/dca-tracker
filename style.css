@@ -324,3 +324,7 @@ label.inline input { width: 110px; }
 .fngago div { display: flex; flex-direction: column; }
 .fngago b { font-size: 1.15rem; }
 @media (max-width: 760px) { .fngbox { grid-template-columns: 1fr; gap: 8px; } }
+.pvnow { text-align: center; font-size: .82rem; font-weight: 650; color: var(--accent); padding: 4px 0; border-top: 1px dashed var(--border); border-bottom: 1px dashed var(--border); margin: 2px 0; }
+.walltag { font-size: .7rem; padding: 0 6px; border-radius: 999px; white-space: nowrap; }
+.walltag.real { background: color-mix(in srgb, var(--accent) 22%, transparent); color: var(--text); }
+.walltag.new { border: 1px dashed var(--muted); }

@@ -230,9 +230,25 @@ function renderBigStats() {
   }
   const net = b.buy - b.sell;
   $('#wBigStats').innerHTML = `
-    ${flowRow('Tổng', b.buy, b.sell)}
+    ${bigRow('Tổng', b.buy, b.sell, (Date.now() - Math.min(b.started, b.since || b.started)) / 60000)}
     <p class="hint">Từ ${since} · tổng ${fmtUsd(total)} (${b.nBuy + b.nSell} lệnh) ·
       ròng <b class="${cls(net)}">${net >= 0 ? '+' : ''}${fmtUsd(net)}</b> ${net >= 0 ? '(mua nhiều hơn)' : '(bán nhiều hơn)'}</p>`;
+}
+
+// Thanh tổng của lệnh lớn: số lệnh ít nên dễ lệch. Chỉ ghi "mạnh" khi từ 65% trở lên và đã theo dõi đủ 30 phút.
+const BIG_STRONG_MINUTES = 30;
+function bigRow(label, buy, sell, minutes) {
+  const total = buy + sell;
+  const pct = total ? buy / total * 100 : 50;
+  const verdict = minutes < BIG_STRONG_MINUTES ? [`Mới ${Math.floor(minutes)}/${BIG_STRONG_MINUTES} phút ·`, 'muted']
+    : pct >= 65 ? ['Gom mạnh', 'up'] : pct >= 55 ? ['Nghiêng gom', 'up']
+    : pct <= 35 ? ['Xả mạnh', 'down'] : pct <= 45 ? ['Nghiêng xả', 'down'] : ['Cân bằng', 'muted'];
+  const side = pct >= 50 ? 'mua' : 'bán';
+  return `<div class="flow">
+    <span>${label}</span>
+    <div class="bar" title="Mua ${pct.toFixed(1)}% / Bán ${(100 - pct).toFixed(1)}%"><span style="width:${pct}%"></span></div>
+    <span class="verdict ${verdict[1]}">${verdict[0]} ${side} ${Math.max(pct, 100 - pct).toFixed(0)}%</span>
+  </div>`;
 }
 
 // ---------- 2. Gom hay xả (taker buy/sell volume) ----------
@@ -293,7 +309,11 @@ async function loadWalls(coin) {
     const book = await getJson(`${SPOT_API}/depth?symbol=${coin}USDT&limit=5000`);
     if (w.coin !== coin) return;
     const mid = (+book.bids[0][0] + +book.asks[0][0]) / 2;
-    const step = mid * 0.0025; // gom các mức giá gần nhau thành cụm 0.25%
+    // Bước gom cụm cố định cho mỗi coin (để theo dõi được một bức tường qua nhiều lần tải).
+    const now = Date.now();
+    if (w.wallCoin !== coin || now - (w.wallAt || 0) > 2 * 60000) { w.wallCoin = coin; w.wallSeen = new Map(); w.wallStep = mid * 0.0025; }
+    w.wallAt = now;
+    const step = w.wallStep; // gom các mức giá gần nhau thành cụm 0.25%
     const group = (levels, lo, hi) => {
       const m = new Map();
       for (const [p, q] of levels) {
@@ -302,15 +322,31 @@ async function loadWalls(coin) {
         const key = Math.round(price / step);
         m.set(key, (m.get(key) || 0) + price * +q);
       }
-      return [...m].map(([key, value]) => ({ price: key * step, value }))
+      return [...m].map(([key, value]) => ({ key, price: key * step, value }))
         .sort((a, b) => b.value - a.value).slice(0, 6);
     };
     const bids = group(book.bids, mid * 0.9, mid);
     const asks = group(book.asks, mid, mid * 1.1);
+    // Theo dõi tuổi của từng bức tường: tường đứng yên ≥5 phút khó là lệnh giả hơn tường vừa xuất hiện.
+    const seen = new Map();
+    for (const [sideKey, list] of [['b', bids], ['a', asks]]) {
+      for (const x of list) {
+        const k = sideKey + x.key;
+        x.age = now - (w.wallSeen.get(k) ?? now);
+        seen.set(k, w.wallSeen.get(k) ?? now);
+      }
+    }
+    w.wallSeen = seen;
+    const tracked = now - Math.min(now, ...seen.values());
+    const tag = (x) => x.age >= 5 * 60000 ? `<small class="walltag real" title="Đã đứng yên ${Math.floor(x.age / 60000)} phút">🧱 tường thật</small>`
+      : tracked >= 2 * 60000 && x.age < 60000 ? '<small class="walltag new" title="Vừa xuất hiện, có thể bị rút">mới</small>' : '';
     const max = Math.max(...bids.map((x) => x.value), ...asks.map((x) => x.value), 1);
     const side = (list, color) => list.map((x) => `
-      <span class="muted">${fmtPrice(x.price)} <small>(${fmtPct((x.price - mid) / mid * 100)})</small></span>
+      <span class="muted">${fmtPrice(x.price)} <small>(${fmtPct((x.price - mid) / mid * 100)})</small> ${tag(x)}</span>
       <span class="lvl"><i style="width:${x.value / max * 100}%;background:var(${color})"></i>${fmtUsd(x.value)}</span>`).join('');
+    const loP = +book.bids[book.bids.length - 1][0], hiP = +book.asks[book.asks.length - 1][0];
+    const cover = `Sổ lệnh Binance trả về ${book.bids.length.toLocaleString('en-US')} mức mỗi bên, phủ từ <b>${fmtPrice(loP)}</b> (${fmtPct((loP - mid) / mid * 100)})
+      đến <b>${fmtPrice(hiP)}</b> (${fmtPct((hiP - mid) / mid * 100)}). Tường nằm ngoài khoảng này không thấy được.`;
     const bidSum = bids.reduce((s, x) => s + x.value, 0), askSum = asks.reduce((s, x) => s + x.value, 0);
     // Chấm điểm theo lệnh chờ trong ±2% quanh giá (gần giá thì khó đặt lệnh giả hơn).
     const near = (levels, lo, hi) => levels.reduce((s, [p, q]) => (+p >= lo && +p <= hi ? s + +p * +q : s), 0);
@@ -326,7 +362,8 @@ async function loadWalls(coin) {
         <div><h3 class="down small">Tường BÁN (kháng cự)</h3><div class="wall">${side(asks, '--down')}</div></div>
       </div>
       <p class="hint">${bidSum > askSum * 1.2 ? 'Phe mua đặt lệnh chờ dày hơn.' : askSum > bidSum * 1.2 ? 'Phe bán đặt lệnh chờ dày hơn.' : 'Lệnh chờ hai bên khá cân bằng.'}
-        Tường lệnh có thể bị rút bất cứ lúc nào.</p>`;
+        Tường lệnh có thể bị rút bất cứ lúc nào.</p>
+      <p class="hint">${cover} 🧱 = tường đã đứng yên từ 5 phút trở lên (khó là lệnh giả hơn); "mới" = vừa xuất hiện dưới 1 phút, dễ bị rút. Web cần mở tab này vài phút để theo dõi tuổi tường.</p>`;
     $('#wBookTime').textContent = new Date().toLocaleTimeString('vi-VN');
   } catch {
     $('#wWalls').innerHTML = '<span class="down small">Không tải được sổ lệnh.</span>';

@@ -106,12 +106,16 @@ function renderGoldSummary() {
     </div>
     <div class="headline ${head.c}">${head.title}<small>${head.sub}</small></div>
     <div class="lights">
-      ${row('💼 Quỹ lớn <small class="muted">(theo tuần)</small>', pend(['cot']) ? loading : state(sc(['cot']), 'ĐANG MUA', 'ĐANG BÁN', 'ĐỨNG IM'), why(['cot']))}
+      ${row(`💼 Quỹ lớn <small class="muted">(${g.cot ? `số liệu ${fmtDateIso(g.cot.date).slice(0, 5)}` : 'theo tuần'})</small>`,
+        pend(['cot']) ? loading : state(sc(['cot']), 'ĐÃ MUA', 'ĐÃ BÁN', 'ĐỨNG IM'),
+        why(['cot']) + (g.cot?.close && g.price ? ` · giá từ hôm đó <b class="${cls(g.price - g.cot.close)}">${fmtPct((g.price - g.cot.close) / g.cot.close * 100)}</b>` : ''))}
       ${row('🌎 Vĩ mô <small class="muted">(lãi suất, USD)</small>', pend(['yield', 'usd']) ? loading : state(sc(['yield', 'usd']), 'THUẬN LỢI', 'BẤT LỢI', 'TRUNG TÍNH'), why(['yield', 'usd']))}
       ${row('⚡ Hôm nay <small class="muted">(ngắn hạn)</small>', pend(['flow', 'oi']) ? loading : state(now, 'BÊN MUA MẠNH', 'BÊN BÁN MẠNH', 'GIẰNG CO'), why(['flow', 'oi', 'big']))}
       ${row('🦈 Cá mập Binance', pend(['ls']) ? loading : state(sc(['ls']), 'TĂNG MUA', 'GIẢM MUA', 'CHƯA RÕ'), why(['ls']))}
     </div>
     <p class="muted small">Quỹ lớn và vĩ mô cho biết xu hướng vài tuần, "Hôm nay" cho biết lực mua bán trong ngày.
+      Số liệu quỹ lớn (COT) là của ngày thứ Ba, công bố tối thứ Sáu, nên luôn trễ vài ngày so với giá.</p>
+    <p class="muted small">
       Tham khảo, không phải lời khuyên đầu tư. Bấm "Xem chi tiết" bên dưới để xem số liệu.</p>`;
 }
 
@@ -242,6 +246,14 @@ function renderCot(d) {
   if (rank <= 10) text += ' Vị thế mua gần mức thấp nhất 1 năm, dư địa mua lại lớn.';
   setGoldSignal('cot', score, text, score > 0 ? `Quỹ mua thêm ~${tonnes(Math.abs(dNet))} tấn tuần qua`
     : score < 0 ? `Quỹ bán bớt ~${tonnes(Math.abs(dNet))} tấn tuần qua` : 'Quỹ gần như giữ nguyên vị thế');
+  // Báo cáo COT là số liệu của ngày thứ Ba (trễ vài ngày): lấy giá đóng cửa hôm đó để so với giá bây giờ.
+  if (g.cot?.date !== cur.date) {
+    g.cot = { date: cur.date, close: null };
+    const t = Date.parse(cur.date + 'T00:00:00Z');
+    getJson(`${FAPI}/klines?symbol=${G_SYM}&interval=1d&startTime=${t}&limit=1`)
+      .then((k) => { if (k[0] && k[0][0] === t && g.cot.date === cur.date) { g.cot.close = +k[0][4]; renderGoldSummary(); } })
+      .catch(() => {});
+  }
 
   const row = (name, L, S, hint) => `<tr><td><b>${name}</b><br><small class="muted">${hint}</small></td>
     <td class="up">${fmtBig(L)}</td><td class="down">${fmtBig(S)}</td><td class="${cls(L - S)}"><b>${L - S >= 0 ? '+' : '-'}${fmtBig(Math.abs(L - S))}</b></td></tr>`;
@@ -342,7 +354,7 @@ function renderGoldBig() {
   $('#gBuyTotal').innerHTML = `${fmtUsd(b.buy)} <small class="muted">· ${b.nBuy} lệnh</small>`;
   $('#gSellTotal').innerHTML = `${fmtUsd(b.sell)} <small class="muted">· ${b.nSell} lệnh</small>`;
   const since = b.since ? new Date(b.since).toLocaleTimeString('vi-VN') : '—';
-  $('#gBigStats').innerHTML = b.buy + b.sell ? flowRow('Tổng', b.buy, b.sell) +
+  $('#gBigStats').innerHTML = b.buy + b.sell ? bigRow('Tổng', b.buy, b.sell, (Date.now() - Math.min(b.started, b.since || b.started)) / 60000) +
     `<p class="hint">Từ ${since} · ròng <b class="${cls(b.buy - b.sell)}">${b.buy - b.sell >= 0 ? '+' : ''}${fmtUsd(b.buy - b.sell)}</b></p>`
     : `<p class="hint">Chưa có lệnh ≥ ${fmtUsd(g.min).replace('.00', '')} kể từ ${since}.</p>`;
 }

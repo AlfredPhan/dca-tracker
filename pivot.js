@@ -147,6 +147,19 @@ function confluences(frames, price, tol = 0.006, range = 0.15) {
     .map((g) => ({ ...g, mid: (g.lo + g.hi) / 2, frames: new Set(g.items.map((i) => i.frame)).size }));
 }
 
+// Độ mạnh của một vùng: khung lớn nặng ký hơn; cộng 1 điểm nếu vùng chứa số tròn (VD BTC 60,000, ETH 2,000, ARB 0.1).
+const ZONE_WEIGHT = { d: 1, w: 2, m: 3, y: 4 };
+function roundIn(lo, hi, price) {
+  const step = Math.pow(10, Math.floor(Math.log10(price))) / 2;
+  const r = Math.round(((lo + hi) / 2) / step) * step;
+  return r > 0 && r >= lo * 0.997 && r <= hi * 1.003 ? r : 0;
+}
+function zoneScore(items, lo, hi, price) {
+  const round = roundIn(lo, hi, price);
+  const pts = items.reduce((s, i) => s + (ZONE_WEIGHT[i.frame] || 1), 0) + (round ? 1 : 0);
+  return { pts, round, stars: pts >= 7 ? 3 : pts >= 4 ? 2 : 1 };
+}
+
 // ---------- Giao diện ----------
 const pv = { started: false, coin: 'BTC', data: {}, price: {}, priceAt: 0, timer: null, loading: {}, xauOff: loadXauOff() };
 
@@ -362,16 +375,39 @@ function renderPivotDetail() {
     </div>`;
   }).join('');
 
-  const conf = confluences(d.frames, price);
-  const below = conf.filter((g) => g.hi < price).slice(-2).reverse();
-  const above = conf.filter((g) => g.lo > price).slice(0, 2);
-  const confRow = (g, isSup) => `<div class="light"><span class="dot">🎯</span>
-    <span class="what">${pivFmt(g.lo)}${g.hi !== g.lo ? ` – ${pivFmt(g.hi)}` : ''} <small class="muted">(${pivDist(g.mid, price)})</small></span>
+  // Luôn hiện cả hai phía: 2 vùng kháng cự gần nhất phía trên, 2 vùng hỗ trợ gần nhất phía dưới.
+  // Ưu tiên vùng hội tụ (≥2 khung); phía nào không có thì lấy mức đơn của khung tuần/tháng/năm gần nhất.
+  const conf = confluences(d.frames, price).map((g) => ({ ...g, score: zoneScore(g.items, g.lo, g.hi, price) }));
+  const singles = [];
+  for (const f of PIV_FRAMES.filter((x) => x.key !== 'd')) {
+    const fr = d.frames[f.key];
+    if (!fr) continue;
+    for (const name of MAIN_LEVELS) {
+      const v = fr.levels[name];
+      if (v > 0 && Math.abs(v - price) / price <= 0.15) singles.push({ lo: v, hi: v, mid: v, items: [{ v, label: `${name} ${f.name}`, frame: f.key }] });
+    }
+  }
+  const pick = (list, isSup) => list.filter((g) => (isSup ? g.hi < price : g.lo > price))
+    .sort((a, b) => (isSup ? b.mid - a.mid : a.mid - b.mid));
+  const side = (isSup) => {
+    const c = pick(conf, isSup).slice(0, 2);
+    if (c.length >= 2) return c;
+    const used = new Set(c.flatMap((g) => g.items.map((i) => i.label)));
+    const extra = pick(singles, isSup).filter((g) => !used.has(g.items[0].label))
+      .map((g) => ({ ...g, single: true, score: zoneScore(g.items, g.lo, g.hi, price) }));
+    return [...c, ...extra].sort((a, b) => (isSup ? b.mid - a.mid : a.mid - b.mid)).slice(0, 2);
+  };
+  const below = side(true), above = side(false);
+  const confRow = (g, isSup) => `<div class="light"><span class="dot">${g.single ? '📍' : '🎯'}</span>
+    <span class="what">${pivFmt(g.lo)}${g.hi !== g.lo ? ` – ${pivFmt(g.hi)}` : ''} <small class="muted">(${pivDist(g.mid, price)})</small>
+      <span class="stars">${'★'.repeat(g.score.stars)}${'☆'.repeat(3 - g.score.stars)}</span></span>
     <span class="state ${isSup ? 'up' : 'down'}">${isSup ? 'HỖ TRỢ' : 'KHÁNG CỰ'}</span>
-    <span class="why">${g.items.map((i) => i.label).join(' + ')}</span></div>`;
+    <span class="why">${g.items.map((i) => i.label).join(' + ')}${g.score.round ? ` + số tròn ${pivFmt(g.score.round)}` : ''}${g.single ? ' (mức đơn)' : ''}</span></div>`;
   const confHtml = below.length || above.length
-    ? [...above.reverse().map((g) => confRow(g, false)), ...below.map((g) => confRow(g, true))].join('')
-    : '<p class="hint">Chưa có vùng nào mà nhiều khung trùng nhau trong khoảng ±15% quanh giá.</p>';
+    ? [...above.slice().reverse().map((g) => confRow(g, false)),
+      `<div class="pvnow">▶ Giá hiện tại ${pivFmt(price)}</div>`,
+      ...below.map((g) => confRow(g, true))].join('')
+    : '<p class="hint">Không có mức Pivot nào trong khoảng ±15% quanh giá.</p>';
 
   $('#pvDetail').innerHTML = `
     <div class="card">
@@ -382,7 +418,8 @@ function renderPivotDetail() {
     <div class="card">
       <h2>🎯 Vùng hội tụ <span class="muted small">(nhiều khung trùng nhau, thường mạnh hơn)</span></h2>
       <div class="lights">${confHtml}</div>
-      <p class="muted small">Các mức của 2 khung trở lên cách nhau không quá 0.6% được gộp thành một vùng.</p>
+      <p class="muted small">🎯 = vùng hội tụ: mức của 2 khung trở lên cách nhau không quá 0.6%. 📍 = mức đơn của khung tuần/tháng/năm (khi phía đó không có vùng hội tụ).
+        ★ càng nhiều càng mạnh: khung lớn nặng ký hơn (ngày 1, tuần 2, tháng 3, năm 4 điểm), cộng thêm nếu vùng chứa số tròn như 60,000 hay 2,000 (nơi nhiều người đặt lệnh).</p>
     </div>
     <div class="pvgrid">${ladders}</div>`;
 }
