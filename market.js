@@ -227,5 +227,73 @@ function renderLiq(status) {
       Coin không có futures trên Binance sẽ không có thanh lý.</p>`;
 }
 
+// ---------- Lịch tin kinh tế Mỹ (tab Vàng) ----------
+// Dữ liệu data/calendar.json do GitHub Actions tạo mỗi giờ: tin mạnh của Mỹ trong tuần + lịch họp FOMC.
+const CAL_TIPS = {
+  cpi: 'Lạm phát cao hơn dự báo → Fed khó giảm lãi → USD mạnh, <b class="down">vàng thường giảm</b>. Thấp hơn dự báo → <b class="up">vàng thường tăng</b>.',
+  jobs: 'Việc làm tốt hơn dự báo (NFP cao, thất nghiệp thấp) → <b class="down">vàng thường giảm</b>. Xấu hơn dự báo → <b class="up">vàng thường tăng</b>.',
+  fed: 'Fed giảm lãi hoặc nói mềm mỏng → <b class="up">vàng thường tăng</b>. Giữ lãi cao, nói cứng rắn → <b class="down">vàng thường giảm</b>.',
+  speech: 'Giọng điệu cứng rắn (muốn giữ lãi cao) → <b class="down">vàng giảm</b>. Mềm mỏng (sẵn sàng giảm lãi) → <b class="up">vàng tăng</b>.',
+  gdp: 'Kinh tế mạnh hơn dự báo → USD mạnh, <b class="down">vàng thường giảm</b>. Yếu hơn → <b class="up">vàng thường tăng</b>.',
+};
+const CAL_ICON = { cpi: '🔥', jobs: '👷', fed: '🏦', speech: '🎤', gdp: '📊', other: '📌' };
+const vnDay = (t) => new Date(t).toLocaleDateString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh', weekday: 'long', day: '2-digit', month: '2-digit' });
+const vnTimeOnly = (t) => new Date(t).toLocaleTimeString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh', hour: '2-digit', minute: '2-digit' });
+function countdown(ms) {
+  const m = Math.round(ms / 60000);
+  if (m < 60) return `còn ${m} phút`;
+  if (m < 1440) return `còn ${Math.floor(m / 60)} giờ ${m % 60} phút`;
+  return `còn ${Math.floor(m / 1440)} ngày ${Math.floor((m % 1440) / 60)} giờ`;
+}
+
+async function refreshCalendar() {
+  const el = $('#gCal');
+  if (!el) return;
+  const data = await loadData('calendar.json');
+  if (!data) { el.innerHTML = '<span class="muted small">Chưa có lịch tin (đang được tạo, thử lại sau ít phút).</span>'; return; }
+  const now = Date.now();
+  const events = data.events || [];
+  const next = events.find((e) => e.t > now);
+  const fomc = (data.fomc || []).find((f) => f.t > now - 3600e3);
+  // Từ 0h thứ Hai tuần này (giờ VN) trở đi.
+  const vn = now + 7 * 3600e3, vnMidnight = vn - (vn % 864e5);
+  const weekStart = vnMidnight - ((new Date(vn).getUTCDay() + 6) % 7) * 864e5 - 7 * 3600e3;
+  const shown = events.filter((e) => e.t >= weekStart);
+
+  const byDay = new Map();
+  for (const e of shown) {
+    const d = vnDay(e.t);
+    if (!byDay.has(d)) byDay.set(d, []);
+    byDay.get(d).push(e);
+  }
+  const rows = [...byDay].map(([day, list]) => `
+    <div class="calday">${day}</div>
+    ${list.map((e) => {
+      const diff = e.t - now;
+      const state = diff < -2 * 3600e3 ? 'past' : diff < 0 ? 'just' : diff < 3600e3 ? 'soon' : '';
+      const badge = state === 'just' ? '<span class="calbadge">vừa ra</span>' : state === 'soon' ? `<span class="calbadge hot">${countdown(diff)}</span>` : '';
+      return `<div class="calrow ${state}">
+        <span class="caltime">${vnTimeOnly(e.t)}</span>
+        <span>${CAL_ICON[e.kind] || '📌'} <b>${esc(e.vi)}</b> ${badge}</span>
+        <span class="calnum">${e.forecast ? `dự báo <b>${esc(e.forecast)}</b>` : ''}${e.previous ? ` · trước ${esc(e.previous)}` : ''}</span>
+      </div>`;
+    }).join('')}`).join('');
+
+  const kinds = [...new Set(shown.filter((e) => e.t > now - 2 * 3600e3).map((e) => e.kind))].filter((k) => CAL_TIPS[k]);
+  el.innerHTML = `
+    ${next ? `<p class="calnext">⏰ Tin kế tiếp: ${CAL_ICON[next.kind] || '📌'} <b>${esc(next.vi)}</b> lúc <b>${vnTimeOnly(next.t)}</b> ${vnDay(next.t)}
+      <span class="calbadge ${next.t - now < 3600e3 ? 'hot' : ''}">${countdown(next.t - now)}</span></p>`
+      : '<p class="calnext muted">Tuần này không còn tin mạnh nào. Lịch tuần sau sẽ có từ Chủ nhật.</p>'}
+    ${fomc ? `<p class="calnext">🏦 Họp Fed (FOMC) kế tiếp: <b>${vnTimeOnly(fomc.t)} ${vnDay(fomc.t)}</b>
+      ${fomc.t > now ? `<span class="calbadge">${countdown(fomc.t - now)}</span>` : '<span class="calbadge hot">vừa công bố</span>'}${fomc.sep ? ' · kèm dự báo kinh tế (biểu đồ chấm)' : ''}</p>` : ''}
+    ${rows ? `<div class="callist">${rows}</div>` : ''}
+    ${kinds.length ? `<details class="caltips"><summary>💡 Cách đọc nhanh: tin ra thì vàng thường đi hướng nào?</summary>
+      ${kinds.map((k) => `<p>${CAL_ICON[k]} ${CAL_TIPS[k]}</p>`).join('')}
+      <p class="muted small">"Thường" nghĩa là phản ứng phổ biến, không phải lúc nào cũng vậy. Quanh giờ ra tin giá giật mạnh hai chiều, spread trên Exness giãn rộng: nên giảm khối lượng hoặc đứng ngoài 15 phút trước và sau tin.</p>
+    </details>` : ''}
+    <p class="muted small">Chỉ tin ảnh hưởng mạnh của Mỹ. Giờ Việt Nam. Nguồn: lịch tuần ForexFactory và lịch họp FOMC của Fed; kết quả thực tế xem trên ForexFactory hoặc Investing ngay khi tin ra.</p>`;
+}
+
 // Nếu tab Cá voi đã khởi động trước khi file này tải xong (VD: mở link #whale=BTC), bắt kịp ngay.
 if (w.started && w.coin) refreshMarket(w.coin);
+if (typeof g !== 'undefined' && g.started) refreshCalendar();

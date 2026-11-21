@@ -35,6 +35,7 @@ function refreshGold() {
   loadGoldFutures();
   loadGoldData();
   scoreGoldBig();
+  if (typeof refreshCalendar === 'function') refreshCalendar(); // lịch tin Mỹ (market.js)
 }
 
 // ---------- Tổng hợp tín hiệu ----------

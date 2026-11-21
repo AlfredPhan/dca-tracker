@@ -27,3 +27,4 @@ EXTRA = "TIA:bybit,FET:coinbase"
 PIVOT_FRAMES = "d,w,m,y"
 PIVOT_LEVELS = "R3,R2,R1,P,S1,S2,S3"
 PIVOT_GOLD = "1" # 1 = báo cả vàng (XAUUSDT), 0 = tắt
+NEWS_REMIND = "1" # 1 = nhắc trước 30 phút khi có tin Mỹ mạnh (CPI, việc làm, Fed...), 0 = tắt

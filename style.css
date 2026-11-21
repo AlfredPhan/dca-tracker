@@ -263,3 +263,19 @@ button, input, select, .tab { -webkit-tap-highlight-color: transparent; touch-ac
 .liqtable td:last-child { text-align: right; }
 @media (max-width: 760px) { .liqflow { grid-template-columns: 92px 1fr auto; } }
 .liqbar.empty, .liqbar.empty > span { background: var(--border); }
+
+/* ---------- Lịch tin Mỹ ---------- */
+.calnext { margin: 0 0 8px; }
+.calbadge { display: inline-block; font-size: .75rem; padding: 1px 8px; border-radius: 999px; background: color-mix(in srgb, var(--accent) 20%, transparent); white-space: nowrap; }
+.calbadge.hot { background: var(--down); color: #fff; }
+.callist { margin-top: 8px; border-top: 1px solid var(--border); }
+.calday { font-size: .8rem; font-weight: 650; color: var(--muted); padding: 8px 0 2px; text-transform: capitalize; }
+.calrow { display: grid; grid-template-columns: 52px 1fr auto; gap: 8px; align-items: baseline; padding: 5px 0; border-bottom: 1px dashed var(--border); font-size: .88rem; }
+.calrow.past { opacity: .5; }
+.calrow.soon { background: color-mix(in srgb, var(--down) 8%, transparent); }
+.caltime { font-variant-numeric: tabular-nums; font-weight: 600; }
+.calnum { font-size: .8rem; color: var(--muted); text-align: right; }
+.caltips { margin-top: 10px; font-size: .88rem; }
+.caltips summary { cursor: pointer; font-weight: 600; }
+.caltips p { margin: 6px 0; }
+@media (max-width: 760px) { .calrow { grid-template-columns: 46px 1fr; } .calnum { grid-column: 2; text-align: left; } }

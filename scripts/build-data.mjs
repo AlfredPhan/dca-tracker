@@ -289,11 +289,94 @@ async function buildGold() {
   return { updated: Date.now(), cot, realYield, dollar, coins: {} };
 }
 
+// ---------- Lịch tin kinh tế Mỹ (tin mạnh, ảnh hưởng tới vàng) ----------
+// 1) File xuất lịch tuần công khai của ForexFactory (chỉ có tuần hiện tại): lọc USD + mức ảnh hưởng High.
+// 2) Lịch họp FOMC chính thức trên trang Fed (cả năm), để luôn biết kỳ họp Fed kế tiếp.
+// Tin của các tuần trước được giữ lại từ bản cũ (feed chỉ có tuần hiện tại).
+const FF_WEEK = 'https://nfs.faireconomy.media/ff_calendar_thisweek.json';
+const FED_FOMC = 'https://www.federalreserve.gov/monetarypolicy/fomccalendars.htm';
+const CAL_RULES = [ // [mẫu tên tiếng Anh, tên tiếng Việt, nhóm]
+  [/^Core CPI m\/m/, 'CPI lõi (tháng)', 'cpi'], [/^CPI m\/m/, 'Lạm phát CPI (tháng)', 'cpi'], [/^CPI y\/y/, 'Lạm phát CPI (năm)', 'cpi'], [/^Core CPI y\/y/, 'CPI lõi (năm)', 'cpi'],
+  [/^Core PCE Price Index/, 'Lạm phát PCE lõi (Fed theo dõi sát nhất)', 'cpi'], [/^PCE Price Index/, 'Lạm phát PCE', 'cpi'],
+  [/^Core PPI/, 'Giá sản xuất PPI lõi', 'cpi'], [/^PPI/, 'Giá sản xuất PPI', 'cpi'],
+  [/^Non-Farm Employment Change/, 'Bảng lương phi nông nghiệp (NFP)', 'jobs'], [/^ADP Non-Farm/, 'Việc làm ADP', 'jobs'],
+  [/^Unemployment Rate/, 'Tỷ lệ thất nghiệp', 'jobs'], [/^Average Hourly Earnings/, 'Thu nhập bình quân theo giờ', 'jobs'],
+  [/^Unemployment Claims/, 'Đơn xin trợ cấp thất nghiệp', 'jobs'], [/^JOLTS/, 'Số việc làm trống JOLTS', 'jobs'],
+  [/^Federal Funds Rate/, 'Fed công bố lãi suất', 'fed'], [/^FOMC Statement/, 'Tuyên bố của Fed (FOMC)', 'fed'],
+  [/^FOMC Press Conference/, 'Họp báo Chủ tịch Fed', 'fed'], [/^FOMC Meeting Minutes/, 'Biên bản họp Fed (FOMC)', 'fed'],
+  [/^FOMC Economic Projections/, 'Dự báo kinh tế của Fed', 'fed'], [/Fed Chair.*Speaks|Chairman .* Speaks/, 'Chủ tịch Fed phát biểu', 'speech'],
+  [/Testifies/, 'Chủ tịch Fed điều trần', 'speech'], [/Speaks/, 'Quan chức Fed phát biểu', 'speech'],
+  [/^Advance GDP/, 'GDP quý (sơ bộ)', 'gdp'], [/^Prelim GDP/, 'GDP quý (điều chỉnh)', 'gdp'], [/^Final GDP/, 'GDP quý (cuối cùng)', 'gdp'],
+  [/^Core Retail Sales/, 'Doanh số bán lẻ lõi', 'gdp'], [/^Retail Sales/, 'Doanh số bán lẻ', 'gdp'],
+  [/^ISM Manufacturing PMI/, 'PMI sản xuất ISM', 'gdp'], [/^ISM Services PMI/, 'PMI dịch vụ ISM', 'gdp'],
+  [/Consumer Sentiment/, 'Niềm tin tiêu dùng (UoM)', 'gdp'], [/Consumer Confidence/, 'Niềm tin tiêu dùng (CB)', 'gdp'],
+];
+const calName = (title) => { const r = CAL_RULES.find(([re]) => re.test(title)); return r ? [r[1], r[2]] : [title, 'other']; };
+
+// Giờ New York (ET, có giờ mùa hè) → mốc UTC.
+function etToUtc(y, mon, d, h, mi) {
+  const guess = Date.UTC(y, mon, d, h, mi);
+  const parts = Object.fromEntries(new Intl.DateTimeFormat('en-US', { timeZone: 'America/New_York', hourCycle: 'h23',
+    year: 'numeric', month: 'numeric', day: 'numeric', hour: 'numeric', minute: 'numeric' }).formatToParts(guess).map((p) => [p.type, +p.value || p.value]));
+  const asEt = Date.UTC(parts.year, parts.month - 1, parts.day, parts.hour, parts.minute);
+  return guess + (guess - asEt);
+}
+
+const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+async function fomcMeetings() {
+  const res = await fetch(FED_FOMC, { headers: { 'user-agent': 'dca-tracker data builder' } });
+  if (!res.ok) throw new Error('Fed HTTP ' + res.status);
+  const html = await res.text();
+  const out = [];
+  for (const sec of html.split(/<h4><a id="\d+">/).slice(1)) {
+    const year = +(sec.match(/^(\d{4}) FOMC Meetings/) || [])[1];
+    if (!year) continue;
+    const re = /<strong>([A-Za-z/]+)<\/strong>[\s\S]*?fomc-meeting__date[^>]*>([^<]+)</g;
+    for (const [, month, date] of sec.matchAll(re)) {
+      const m = date.trim().match(/^(\d+)-(\d+)(\*)?$/); // bỏ họp bất thường / bỏ phiếu từ xa
+      if (!m) continue;
+      const [m1, m2] = month.split('/');
+      const mon = MONTHS.indexOf(+m[2] < +m[1] && m2 ? m2 : m1);
+      if (mon < 0) continue;
+      // Fed công bố quyết định lúc 14:00 giờ New York ngày họp thứ hai; dấu * = kèm dự báo kinh tế (biểu đồ chấm).
+      out.push({ t: etToUtc(year, mon, +m[2], 14, 0), title: 'FOMC rate decision', vi: 'Fed công bố lãi suất (họp FOMC)', kind: 'fed', sep: !!m[3], src: 'fed' });
+    }
+  }
+  if (!out.length) throw new Error('không đọc được lịch họp FOMC');
+  return out.filter((f) => f.t >= Date.now() - 30 * DAY * 1000).sort((a, b) => a.t - b.t); // bỏ các năm cũ
+}
+
+async function buildCalendar() {
+  const prev = await previous('calendar.json');
+  const now = Date.now();
+  let week = [];
+  try {
+    const res = await fetch(FF_WEEK, { headers: { 'user-agent': 'dca-tracker data builder' } });
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    week = (await res.json()).filter((e) => e.country === 'USD' && e.impact === 'High').map((e) => {
+      const [vi, kind] = calName(e.title);
+      return { t: Date.parse(e.date), title: e.title, vi, kind, forecast: e.forecast || '', previous: e.previous || '', src: 'ff' };
+    }).filter((e) => isFinite(e.t));
+  } catch (e) { console.error(`calendar tuần lỗi: ${e.message}, dùng tin cũ`); }
+  let fomc = prev?.fomc || [];
+  try { fomc = await fomcMeetings(); } catch (e) { console.error(`FOMC lỗi: ${e.message}, giữ bản cũ`); }
+
+  // Giữ tin cũ (14 ngày gần nhất) không còn trong feed; tin trong feed mới thay thế tin cùng tên + giờ.
+  const key = (e) => e.title + '|' + e.t;
+  const fresh = new Set(week.map(key));
+  const kept = (prev?.events || []).filter((e) => e.src === 'ff' && !fresh.has(key(e)) && e.t >= now - 14 * DAY * 1000);
+  const events = [...kept, ...week].sort((a, b) => a.t - b.t);
+  if (!events.length && !fomc.length) throw new Error('không có tin nào');
+  console.log(`calendar: ${week.length} tin mạnh tuần này, giữ ${kept.length} tin cũ, ${fomc.length} kỳ họp FOMC (kế tiếp ${new Date(fomc.find((f) => f.t > now)?.t || 0).toISOString().slice(0, 10)})`);
+  return { updated: now, events, fomc, coins: {} };
+}
+
 // ---------- Chạy ----------
 const previous = (name) => getJson(SITE + 'data/' + name).catch(() => null);
 await mkdir(OUT, { recursive: true });
 
 async function save(name, build) {
+  if (process.env.ONLY && !process.env.ONLY.split(',').includes(name)) return; // VD: ONLY=calendar.json để chạy thử 1 phần
   try {
     const data = await build();
     await writeFile(new URL(name, OUT), JSON.stringify(data));
@@ -309,3 +392,4 @@ await save('unlocks.json', buildUnlocks);
 const prevOnchain = await previous('onchain.json');
 await save('onchain.json', () => buildOnchain(prevOnchain));
 await save('gold.json', buildGold);
+await save('calendar.json', buildCalendar);

@@ -6,6 +6,7 @@
 import { DurableObject } from 'cloudflare:workers';
 import { recordDay, periodsEndingAt, periodSummary, cleanup } from './summary.js';
 import { pivotCheck } from './pivot.js';
+import { calendarReminder, calendarToday } from './calendar.js';
 
 // Binance chặn một số vùng của Cloudflare, nên thử lần lượt các host.
 const BINANCE_HOSTS = ['https://api-gcp.binance.com', 'https://api.binance.com', 'https://data-api.binance.vision'];
@@ -207,6 +208,14 @@ async function check(env, scheduledTime, storage) {
     if (msg) await sendTelegram(env, msg);
   } catch (e) { console.log('pivot error:', e.message); }
 
+  // Nhắc trước 30 phút khi sắp có tin kinh tế mạnh của Mỹ (CPI, việc làm, Fed...).
+  if (env.NEWS_REMIND !== '0') {
+    try {
+      const msg = await calendarReminder({ storage, getJson, url: DATA_URL + 'calendar.json', end });
+      if (msg) await sendTelegram(env, msg + `\n<a href="${SITE.replace('#whale', '#gold')}">xem lịch</a>`);
+    } catch (e) { console.log('calendar error:', e.message); }
+  }
+
   // 7:00 sáng giờ VN: nến Binance đóng. Tổng kết nến ngày (mỗi ngày), tuần (thứ Hai), tháng (ngày 1), năm (1/1).
   // % giá trong nến: lấy nến ngày 1 lần cho mỗi coin (đủ cho kỳ dài nhất), rồi tính giá mở/đóng của từng kỳ.
   const periods = periodsEndingAt(end);
@@ -235,8 +244,9 @@ async function check(env, scheduledTime, storage) {
   // 8:00 sáng giờ VN (hoặc mỗi phút khi bật SEND_TEST): báo bot vẫn đang chạy.
   if (env.SEND_TEST === '1' || (d.getUTCHours() === 1 && d.getUTCMinutes() === 0)) {
     const unlocks = await unlockReminder(coins.map((c) => c.coin)).catch((e) => `⚠️ Không lấy được lịch unlock: ${e.message}`);
+    const news = await calendarToday({ storage, getJson, url: DATA_URL + 'calendar.json', end }).catch((e) => `⚠️ Không lấy được lịch tin: ${e.message}`);
     await sendTelegram(env, `☀️ Bot cá voi vẫn đang chạy. Theo dõi: ${env.COINS}${env.EXTRA ? `\nSàn phụ: ${env.EXTRA}` : ''}` +
-      (unlocks ? `\n\n${unlocks}` : ''));
+      (news ? `\n\n${news}` : '') + (unlocks ? `\n\n${unlocks}` : ''));
   }
 }
 
