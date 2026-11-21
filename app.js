@@ -99,6 +99,7 @@ function render() {
   renderPie(hs);
   renderSimOptions(hs);
   renderSim();
+  if (typeof renderDcaZones === 'function') renderDcaZones(hs); // market.js
 }
 
 function renderSummary(hs) {

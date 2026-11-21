@@ -10,7 +10,7 @@
   <meta name="theme-color" content="#f5f6f8" media="(prefers-color-scheme: light)">
   <meta name="theme-color" content="#181c22" media="(prefers-color-scheme: dark)">
   <title>Altcoin DCA Tracker</title>
-  <link rel="stylesheet" href="style.css?v=202611211510">
+  <link rel="stylesheet" href="style.css?v=202611211610">
 </head>
 <body>
   <header class="topbar">
@@ -293,6 +293,14 @@
     </section>
 
     <section class="card">
+      <div class="row between wrap">
+        <h2>🎯 Gợi ý vùng mua DCA <span class="muted small">(theo hỗ trợ Pivot)</span></h2>
+        <label class="inline">Vốn dự định mỗi coin (USDT) <input id="dcaBudget" type="number" inputmode="decimal" min="1" step="10" value="100"></label>
+      </div>
+      <div id="dcaZones"><span class="muted small">Đang tải…</span></div>
+    </section>
+
+    <section class="card">
       <div class="row between">
         <h2>Lịch sử lệnh <span id="histFilter" class="muted"></span></h2>
         <button id="clearFilter" class="ghost" hidden>Xem tất cả</button>
@@ -307,10 +315,10 @@
   </main>
 
   <footer class="muted small">Dữ liệu chỉ lưu trên trình duyệt này. Nhớ bấm “Xuất” để sao lưu. Giá lấy từ Binance.</footer>
-  <script src="app.js?v=202611211510"></script>
-  <script src="whale.js?v=202611211510"></script>
-  <script src="gold.js?v=202611211510"></script>
-  <script src="pivot.js?v=202611211510"></script>
-  <script src="market.js?v=202611211510"></script>
+  <script src="app.js?v=202611211610"></script>
+  <script src="whale.js?v=202611211610"></script>
+  <script src="gold.js?v=202611211610"></script>
+  <script src="pivot.js?v=202611211610"></script>
+  <script src="market.js?v=202611211610"></script>
 </body>
 </html>

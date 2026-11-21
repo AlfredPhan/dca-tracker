@@ -278,6 +278,93 @@ async function loadEtf(coin) {
   bar.addEventListener('pointerdown', show);
 }
 
+// ---------- Gợi ý vùng mua DCA (tab Danh mục) ----------
+// Dùng các mức Pivot (pivot.js: loadPivotCoin, pv.data, MAIN_LEVELS, PIV_FRAMES) nằm dưới giá hiện tại.
+// Các mức sát nhau (≤1.5%) gộp thành một vùng; khung lớn hơn nặng ký hơn: ngày 1, tuần 2, tháng 3, năm 4 điểm.
+const DCA_BUDGET_KEY = 'dca-zone-budget';
+const DCA_FALLBACK = ['BTC', 'ETH', 'ARB', 'APT', 'FET', 'OP', 'TIA', 'LDO', 'BICO'];
+const DCA_WEIGHT = { d: 1, w: 2, m: 3, y: 4 };
+const DCA_SPLIT = { 1: [1], 2: [0.4, 0.6], 3: [0.25, 0.35, 0.4] }; // vùng càng sâu mua càng nhiều
+const dcaState = { busy: false, budget: (() => { try { return +localStorage.getItem(DCA_BUDGET_KEY) || 100; } catch { return 100; } })() };
+
+function dcaZones(frames, price) {
+  const pts = [];
+  for (const f of PIV_FRAMES) {
+    const fr = frames[f.key];
+    if (!fr) continue;
+    for (const n of MAIN_LEVELS) {
+      const v = fr.levels[n];
+      if (v > 0 && v < price && v > price * 0.6) pts.push({ v, label: `${n} ${f.name}`, w: DCA_WEIGHT[f.key] });
+    }
+  }
+  pts.sort((a, b) => b.v - a.v); // gần giá nhất trước
+  const groups = [];
+  for (const p of pts) {
+    const g = groups[groups.length - 1];
+    if (g && (g.hi - p.v) / g.hi <= 0.015) { g.items.push(p); g.lo = p.v; g.score += p.w; }
+    else groups.push({ hi: p.v, lo: p.v, items: [p], score: p.w });
+  }
+  return groups.filter((g) => g.score >= 2).slice(0, 3).map((g) => ({
+    ...g, mid: (g.hi + g.lo) / 2, stars: g.score >= 6 ? 3 : g.score >= 3 ? 2 : 1,
+  }));
+}
+
+function dcaFresh(coin) {
+  const d = pv.data[coin];
+  return d && !d.error && Date.now() - d.at < 30 * 60000 && Object.values(d.frames).every((fr) => fr.next > Date.now());
+}
+
+async function renderDcaZones(hs) {
+  const el = $('#dcaZones');
+  if (!el || typeof loadPivotCoin !== 'function') return;
+  const held = hs.filter((h) => h.qty > 0 && h.coin !== 'USDT' && prices[h.coin]);
+  const coins = held.length ? held.map((h) => h.coin) : DCA_FALLBACK;
+  const missing = coins.filter((c) => !dcaFresh(c));
+  if (missing.length && !dcaState.busy) {
+    dcaState.busy = true;
+    await Promise.all(missing.map((c) => loadPivotCoin(c)));
+    dcaState.busy = false;
+  }
+  const budget = dcaState.budget;
+  const blocks = coins.map((coin) => {
+    const d = pv.data[coin], price = prices[coin], h = held.find((x) => x.coin === coin);
+    if (!d || d.error || !price) return `<div class="dcacoin"><b>${esc(coin)}</b> <span class="muted small">Đang tải…</span></div>`;
+    const zones = dcaZones(d.frames, price);
+    const head = `<div class="row between wrap"><span><b>${esc(coin)}</b> · giá <b>${fmtPrice(price)}</b>${h?.avg
+      ? ` · DCA của bạn <b>${fmtPrice(h.avg)}</b> <span class="${cls(price - h.avg)}">(${fmtPct((price - h.avg) / h.avg * 100)})</span>` : ''}</span></div>`;
+    if (!zones.length) return `<div class="dcacoin">${head}<p class="hint">Giá đang dưới hầu hết các mức hỗ trợ Pivot, chưa có vùng mua rõ ràng. Cẩn thận "bắt dao rơi", nên chia nhỏ vốn và chờ giá ổn định.</p></div>`;
+    const split = DCA_SPLIT[zones.length];
+    let addQty = 0;
+    const rows = zones.map((z, i) => {
+      const amt = budget * split[i];
+      addQty += amt / z.mid;
+      const inZone = price <= z.hi * 1.005;
+      return `<div class="dcarow ${inZone ? 'in' : ''}">
+        <span>Vùng ${i + 1} <span class="stars">${'★'.repeat(z.stars)}${'☆'.repeat(3 - z.stars)}</span></span>
+        <span><b>${fmtPrice(z.lo)}${z.hi !== z.lo ? ' – ' + fmtPrice(z.hi) : ''}</b> <span class="muted small">${z.items.map((x) => x.label).join(', ')}</span></span>
+        <span class="${inZone ? 'up' : 'down'}">${inZone ? '🎯 đang ở vùng' : fmtPct((z.mid - price) / price * 100)}</span>
+        <span>${fmtUsd(amt).replace('.00', '')}</span>
+      </div>`;
+    }).join('');
+    const after = h ? (h.cost + budget) / (h.qty + addQty) : null;
+    return `<div class="dcacoin">${head}${rows}
+      ${h ? `<p class="hint">Nếu khớp đủ ${zones.length} vùng với ${fmtUsd(budget).replace('.00', '')}: giá DCA ${fmtPrice(h.avg)} → <b class="${cls(h.avg - after)}">${fmtPrice(after)}</b> (${fmtPct((after - h.avg) / h.avg * 100)}).</p>` : ''}
+    </div>`;
+  }).join('');
+  el.innerHTML = `
+    ${held.length ? '' : '<p class="hint">Bạn chưa có coin nào trong danh mục, đang hiện gợi ý cho BTC, ETH và 7 coin theo dõi.</p>'}
+    ${blocks}
+    <p class="hint">★ càng nhiều = vùng càng mạnh (nhiều mức Pivot của khung tuần/tháng/năm trùng nhau). Vốn chia dần: vùng sâu hơn mua nhiều hơn.
+      Đây là gợi ý theo mức Pivot, không đảm bảo giá sẽ chạm hoặc bật lên từ vùng đó. Mức đổi khi sang ngày, tuần, tháng mới.</p>`;
+}
+
+$('#dcaBudget').value = dcaState.budget;
+$('#dcaBudget').addEventListener('change', (e) => {
+  dcaState.budget = Math.max(1, +e.target.value || 100);
+  try { localStorage.setItem(DCA_BUDGET_KEY, dcaState.budget); } catch {}
+  renderDcaZones(computeHoldings());
+});
+
 // ---------- Lịch tin kinh tế Mỹ (tab Vàng) ----------
 // Dữ liệu data/calendar.json do GitHub Actions tạo mỗi giờ: tin mạnh của Mỹ trong tuần + lịch họp FOMC.
 const CAL_TIPS = {
@@ -348,3 +435,4 @@ async function refreshCalendar() {
 // Nếu tab Cá voi đã khởi động trước khi file này tải xong (VD: mở link #whale=BTC), bắt kịp ngay.
 if (w.started && w.coin) refreshMarket(w.coin);
 if (typeof g !== 'undefined' && g.started) refreshCalendar();
+if (Object.keys(prices).length) renderDcaZones(computeHoldings());
