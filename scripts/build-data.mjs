@@ -414,7 +414,14 @@ async function buildEtf() {
   const out = { updated: Date.now(), source: 'Farside Investors (farside.co.uk)', coins: {} };
   for (const [coin, url] of Object.entries(FARSIDE)) {
     try {
-      const fresh = await farsideTable((prev?.coins?.[coin]?.length || 0) < 100 ? FARSIDE_ALL[coin] : url);
+      await sleep(3000); // nghỉ giữa các lần tải cho nhẹ phía máy chủ Farside
+      let fresh;
+      if ((prev?.coins?.[coin]?.length || 0) < 100) {
+        // Lần đầu: thử trang toàn bộ lịch sử; nếu bị từ chối thì dùng trang 15 ngày (lịch sử sẽ tích lũy dần).
+        fresh = await farsideTable(FARSIDE_ALL[coin]).catch((e) => { console.error(`etf ${coin} trang lịch sử lỗi: ${e.message}, dùng trang gần đây`); return null; });
+        if (!fresh) await sleep(3000);
+      }
+      fresh ||= await farsideTable(url);
       // Gộp với bản cũ để giữ lịch sử dài hơn bảng trên trang (bản mới ghi đè ngày trùng).
       const map = new Map((prev?.coins?.[coin] || []).map((x) => [x.d, x]));
       for (const x of fresh) map.set(x.d, x);
