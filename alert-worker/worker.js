@@ -4,7 +4,7 @@
 // Cấu hình trong wrangler.toml (COINS, EXTRA). Secrets: TELEGRAM_TOKEN, CHAT_ID.
 
 import { DurableObject } from 'cloudflare:workers';
-import { recordDay, dailySummary } from './summary.js';
+import { recordDay, periodsEndingAt, periodSummary, cleanup } from './summary.js';
 
 // Binance chặn một số vùng của Cloudflare, nên thử lần lượt các host.
 const BINANCE_HOSTS = ['https://api-gcp.binance.com', 'https://api.binance.com', 'https://data-api.binance.vision'];
@@ -193,20 +193,20 @@ async function check(env, scheduledTime, storage) {
 
   try { await recordDay(storage, start, tally); } catch (e) { console.log('recordDay error:', e.message); }
 
-  // 7:00 sáng giờ VN: nến ngày Binance đóng, tổng kết gom/xả của nến vừa đóng (7:00 hôm qua → 7:00 hôm nay).
-  const d0 = new Date(end);
-  if (d0.getUTCHours() === 0 && d0.getUTCMinutes() === 0) {
+  // 7:00 sáng giờ VN: nến Binance đóng. Tổng kết nến ngày (mỗi ngày), tuần (thứ Hai), tháng (ngày 1), năm (1/1).
+  const priceChange = async (coin, p) => {
+    if (!host) return null;
+    const k = await getJson(`${host}/api/v3/klines?symbol=${coin}USDT&interval=${p.interval}&startTime=${p.from}&endTime=${p.to - 1}&limit=${p.limit}`);
+    return k.length ? (+k[k.length - 1][4] / +k[0][1] - 1) * 100 : null;
+  };
+  for (const p of periodsEndingAt(end)) {
     try {
-      const priceChange = async (coin, from, to) => {
-        if (!host) return null;
-        const k = await getJson(`${host}/api/v3/klines?symbol=${coin}USDT&interval=1h&startTime=${from}&endTime=${to - 1}&limit=24`);
-        return k.length ? (+k[k.length - 1][4] / +k[0][1] - 1) * 100 : null;
-      };
-      await sendTelegram(env, (await dailySummary(storage, coins, end, priceChange)) + ` · <a href="${SITE}">web</a>`);
+      await sendTelegram(env, (await periodSummary(storage, coins, p, priceChange)) + ` · <a href="${SITE}">web</a>`);
     } catch (e) {
-      await sendTelegram(env, `⚠️ Không tạo được bản tổng kết ngày: ${e.message}`);
+      await sendTelegram(env, `⚠️ Không tạo được bản tổng kết ${p.kind}: ${e.message}`);
     }
   }
+  if (periodsEndingAt(end).length) await cleanup(storage, end).catch((e) => console.log('cleanup error:', e.message));
 
   // Báo lỗi tối đa 1 lần/giờ để không spam.
   const d = new Date(end);
