@@ -328,3 +328,4 @@ label.inline input { width: 110px; }
 .walltag { font-size: .7rem; padding: 0 6px; border-radius: 999px; white-space: nowrap; }
 .walltag.real { background: color-mix(in srgb, var(--accent) 22%, transparent); color: var(--text); }
 .walltag.new { border: 1px dashed var(--muted); }
+.histbars span.part i { opacity: .45; }
