@@ -20,18 +20,32 @@ const MAX_PAGES = 5;
 // Vì vậy cron chỉ gọi sang Durable Object "Scanner" được ghim ở châu Á, việc quét chạy ở đó.
 export class Scanner extends DurableObject {
   async fetch(request) {
+    // Chỉ đọc: số tổng gom/xả theo ngày (cho biểu đồ lịch sử trên web). Không chạy hay thay đổi gì.
+    if (new URL(request.url).pathname === '/history') {
+      const days = Object.fromEntries(await this.ctx.storage.list({ prefix: 'day:' }));
+      const coins = parseCoins(this.env.COINS || '').map(({ coin, min }) => ({ coin, min }));
+      return Response.json({ updated: Date.now(), coins, days });
+    }
     const { scheduledTime } = await request.json();
     await check(this.env, scheduledTime, this.ctx.storage);
     return new Response('ok');
   }
 }
 
+const scanner = (env) => env.SCANNER.get(env.SCANNER.idFromName('main'), { locationHint: 'apac' });
+
 export default {
   async scheduled(event, env, ctx) {
-    const stub = env.SCANNER.get(env.SCANNER.idFromName('main'), { locationHint: 'apac' });
-    ctx.waitUntil(stub.fetch('https://scanner/run', {
+    ctx.waitUntil(scanner(env).fetch('https://scanner/run', {
       method: 'POST', body: JSON.stringify({ scheduledTime: event.scheduledTime }),
     }));
+  },
+  // Link công khai duy nhất: GET /history (chỉ đọc). GitHub Actions lấy mỗi giờ để ghi ra data/history.json.
+  async fetch(request, env) {
+    const url = new URL(request.url);
+    if (request.method !== 'GET' || url.pathname !== '/history') return new Response('Not found', { status: 404 });
+    const res = await scanner(env).fetch('https://scanner/history');
+    return new Response(res.body, { headers: { 'content-type': 'application/json', 'cache-control': 'max-age=300' } });
   },
 };
 

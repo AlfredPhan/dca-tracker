@@ -437,6 +437,20 @@ async function buildEtf() {
   return out;
 }
 
+// ---------- Lịch sử gom/xả lệnh lớn (từ bot Telegram) ----------
+// Bot cộng dồn lệnh lớn theo nến ngày Binance; link chỉ-đọc /history nằm trong secret BOT_HISTORY_URL của repo.
+async function buildHistory() {
+  const url = process.env.BOT_HISTORY_URL;
+  if (!url) throw new Error('chưa có secret BOT_HISTORY_URL');
+  const d = await getJson(url);
+  const days = Object.entries(d.days || {})
+    .map(([k, v]) => ({ d: k.replace('day:', ''), runs: v.runs, coins: v.coins }))
+    .sort((a, b) => (a.d < b.d ? -1 : 1));
+  if (!days.length) throw new Error('bot chưa có dữ liệu ngày nào');
+  console.log(`history: ${days.length} ngày (${days[0].d} → ${days.at(-1).d}), ${d.coins.length} coin`);
+  return { updated: Date.now(), thresholds: d.coins, days, coins: Object.fromEntries(d.coins.map((c) => [c.coin, c.min])) };
+}
+
 // ---------- Chạy ----------
 const previous = (name) => getJson(SITE + 'data/' + name).catch(() => null);
 await mkdir(OUT, { recursive: true });
@@ -460,3 +474,4 @@ await save('onchain.json', () => buildOnchain(prevOnchain));
 await save('gold.json', buildGold);
 await save('calendar.json', buildCalendar);
 await save('etf.json', buildEtf);
+await save('history.json', buildHistory);

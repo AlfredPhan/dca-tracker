@@ -303,3 +303,13 @@ label.inline input { width: 110px; }
 .dcarow.in { background: color-mix(in srgb, var(--up) 10%, transparent); border-radius: 6px; }
 .stars { color: var(--accent); letter-spacing: 1px; }
 @media (max-width: 760px) { .dcarow { grid-template-columns: 1fr auto auto; row-gap: 0; } .dcarow > span:nth-child(2) { grid-column: 1 / -1; order: 3; } }
+
+/* ---------- Lịch sử gom/xả ---------- */
+.histbars { position: relative; display: flex; gap: 3px; height: 140px; margin-top: 4px; }
+.histbars::before { content: ""; position: absolute; left: 0; right: 0; top: 50%; border-top: 1px solid var(--border); }
+.histbars span { flex: 1; position: relative; cursor: pointer; max-width: 40px; }
+.histbars span.cur { outline: 1px dashed var(--muted); outline-offset: 1px; border-radius: 3px; }
+.histbars i { position: absolute; left: 0; right: 0; border-radius: 2px; }
+.histbars i.b { bottom: 50%; background: var(--up); }
+.histbars i.s { top: 50%; background: var(--down); }
+.histbars span:hover i { filter: brightness(1.2); }

@@ -15,6 +15,7 @@ function refreshMarket(coin) {
   if (mk.coin !== coin) startMarket(coin);
   loadCvd(coin);
   loadEtf(coin);
+  loadHistory(coin);
 }
 
 // ---------- CVD: dòng tiền chủ động cộng dồn ----------
@@ -276,6 +277,78 @@ async function loadEtf(coin) {
   const show = (e) => { if (e.target.dataset.tip) tip.textContent = e.target.dataset.tip; };
   bar.addEventListener('pointerover', show);
   bar.addEventListener('pointerdown', show);
+}
+
+// ---------- Lịch sử gom/xả lệnh lớn (số bot Telegram ghi theo nến ngày Binance) ----------
+// data/history.json: GitHub Actions lấy từ bot mỗi giờ. Gộp tuần (thứ Hai) và tháng theo mốc nến Binance.
+mk.histFrame = 'd';
+const HIST_BARS = { d: 30, w: 26, m: 24 };
+
+$('#wHistOpts').addEventListener('click', (e) => {
+  const b = e.target.closest('button[data-hf]');
+  if (!b) return;
+  mk.histFrame = b.dataset.hf;
+  $('#wHistOpts').querySelectorAll('button').forEach((x) => x.classList.toggle('active', x === b));
+  if (mk.coin) loadHistory(mk.coin);
+});
+
+function histKey(d, f) {
+  if (f === 'd') return d;
+  if (f === 'm') return d.slice(0, 7);
+  const t = Date.parse(d + 'T00:00:00Z'), wd = (new Date(t).getUTCDay() + 6) % 7;
+  return new Date(t - wd * 864e5).toISOString().slice(0, 10); // thứ Hai đầu tuần
+}
+function histLabel(k, f) {
+  if (f === 'm') return `${k.slice(5, 7)}/${k.slice(0, 4)}`;
+  return `${k.slice(8, 10)}/${k.slice(5, 7)}`;
+}
+
+async function loadHistory(coin) {
+  const el = $('#wHist');
+  const data = await loadData('history.json');
+  if (mk.coin !== coin) return;
+  if (!data?.days?.length) { el.innerHTML = '<span class="muted small">Chưa có dữ liệu lịch sử từ bot (đang được tạo, thử lại sau).</span>'; return; }
+  const min = data.coins?.[coin];
+  if (!min) {
+    el.innerHTML = `<p class="muted small">Bot chỉ ghi lịch sử cho ${Object.keys(data.coins).join(', ')}. ${esc(coin)} chưa có trong danh sách theo dõi của bot.</p>`;
+    return;
+  }
+  const f = mk.histFrame;
+  const groups = new Map();
+  for (const day of data.days) {
+    const k = histKey(day.d, f);
+    const g = groups.get(k) || { k, b: 0, s: 0, nb: 0, ns: 0 };
+    const t = day.coins[coin];
+    if (t) { g.b += t.b; g.s += t.s; g.nb += t.nb; g.ns += t.ns; }
+    groups.set(k, g);
+  }
+  const list = [...groups.values()].sort((a, b) => (a.k < b.k ? -1 : 1)).slice(-HIST_BARS[f]);
+  const curKey = histKey(new Date().toISOString().slice(0, 10), f); // kỳ đang chạy (chưa đóng nến)
+  const max = Math.max(...list.map((g) => Math.max(g.b, g.s)), 1);
+  const tb = list.reduce((x, g) => x + g.b, 0), ts = list.reduce((x, g) => x + g.s, 0);
+  const lean = (g) => { const t = g.b + g.s; return !t ? 0 : g.b / t >= 0.6 ? 1 : g.b / t <= 0.4 ? -1 : 0; };
+  const closed = list.filter((g) => g.k !== curKey);
+  const nG = closed.filter((g) => lean(g) > 0).length, nX = closed.filter((g) => lean(g) < 0).length;
+  const unit = { d: 'ngày', w: 'tuần', m: 'tháng' }[f];
+  const net = tb - ts, pct = tb + ts ? tb / (tb + ts) * 100 : 50;
+  const verdict = pct >= 60 ? ['up', `🟢 Tổng cộng lệnh lớn <b>GOM</b> nhiều hơn (${pct.toFixed(0)}% là mua).`]
+    : pct <= 40 ? ['down', `🔴 Tổng cộng lệnh lớn <b>XẢ</b> nhiều hơn (${(100 - pct).toFixed(0)}% là bán).`]
+    : ['muted', `⚪ Lệnh lớn mua và bán khá cân bằng (${pct.toFixed(0)}% mua).`];
+  const sUsd = (v) => fmtUsdShort(v);
+  el.innerHTML = `
+    <div class="histbars">${list.map((g) => `<span class="${g.k === curKey ? 'cur' : ''}"
+        data-tip="${histLabel(g.k, f)}${g.k === curKey ? ' (đang chạy)' : ''}: mua ${sUsd(g.b)} (${g.nb}) · bán ${sUsd(g.s)} (${g.ns}) · ròng ${g.b - g.s >= 0 ? '+' : ''}${sUsd(g.b - g.s)}">
+        <i class="b" style="height:${(g.b / max * 50).toFixed(1)}%"></i><i class="s" style="height:${(g.s / max * 50).toFixed(1)}%"></i></span>`).join('')}</div>
+    <div class="row between small muted"><span>${histLabel(list[0].k, f)}</span><span id="wHistTip">Chạm vào cột để xem số</span><span>${histLabel(list[list.length - 1].k, f)}</span></div>
+    <p class="hint">${list.length} ${unit} gần nhất: mua <b class="up">${sUsd(tb)}</b> · bán <b class="down">${sUsd(ts)}</b> · ròng <b class="${cls(net)}">${net >= 0 ? '+' : ''}${sUsd(net)}</b>
+      ${closed.length ? ` · ${nG} ${unit} gom, ${nX} ${unit} xả, ${closed.length - nG - nX} giằng co` : ''}</p>
+    <p class="verdictline ${verdict[0]}">${verdict[1]}</p>
+    <p class="hint">Chỉ tính lệnh lớn từ ${fmtUsdShort(min)} (đúng các lệnh bot báo qua Telegram), theo nến Binance: ngày mới lúc 7:00, tuần mới sáng thứ Hai.
+      Cột viền nét đứt là kỳ đang chạy. Bot bắt đầu ghi từ ${histLabel(data.days[0].d, 'd')}/${data.days[0].d.slice(0, 4)}, nên lịch sử sẽ dài dần theo thời gian.</p>`;
+  const tip = $('#wHistTip'), bars = $('#wHist .histbars');
+  const show = (e) => { const sp = e.target.closest('[data-tip]'); if (sp) tip.textContent = sp.dataset.tip; };
+  bars.addEventListener('pointerover', show);
+  bars.addEventListener('pointerdown', show);
 }
 
 // ---------- Gợi ý vùng mua DCA (tab Danh mục) ----------

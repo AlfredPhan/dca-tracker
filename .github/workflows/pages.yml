@@ -30,6 +30,8 @@ jobs:
           node-version: 22
       - name: Build data
         run: node scripts/build-data.mjs
+        env:
+          BOT_HISTORY_URL: ${{ secrets.BOT_HISTORY_URL }} # link chỉ-đọc /history của bot (để trong secret cho khỏi lộ)
         continue-on-error: true
         timeout-minutes: 15
       - uses: actions/configure-pages@v5
