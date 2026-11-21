@@ -4,6 +4,7 @@
 // Cấu hình trong wrangler.toml (COINS, EXTRA). Secrets: TELEGRAM_TOKEN, CHAT_ID.
 
 import { DurableObject } from 'cloudflare:workers';
+import { recordDay, dailySummary } from './summary.js';
 
 // Binance chặn một số vùng của Cloudflare, nên thử lần lượt các host.
 const BINANCE_HOSTS = ['https://api-gcp.binance.com', 'https://api.binance.com', 'https://data-api.binance.vision'];
@@ -18,7 +19,7 @@ const MAX_PAGES = 5;
 export class Scanner extends DurableObject {
   async fetch(request) {
     const { scheduledTime } = await request.json();
-    await check(this.env, scheduledTime);
+    await check(this.env, scheduledTime, this.ctx.storage);
     return new Response('ok');
   }
 }
@@ -130,7 +131,7 @@ const EXCHANGES = {
 const usdK = (n) => n >= 1e6 ? `$${(n / 1e6).toFixed(2)}M` : n >= 1000 ? `$${(n / 1000).toFixed(1)}K` : `$${Math.round(n)}`;
 const vnTime = (ms) => new Date(ms).toLocaleTimeString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh', hour: '2-digit', minute: '2-digit' });
 
-async function check(env, scheduledTime) {
+async function check(env, scheduledTime, storage) {
   // Mỗi lần chạy xét đúng 1 phút vừa qua, nên các lần chạy không trùng nhau.
   const end = Math.floor(scheduledTime / 60000) * 60000;
   const start = end - 60000;
@@ -139,6 +140,7 @@ async function check(env, scheduledTime) {
   const source = host ? 'Binance' : 'OKX';
   const blocks = [];
   const errors = [];
+  const tally = {}; // cộng dồn lệnh lớn của phút này theo coin (gộp các sàn) cho bản tổng kết ngày
 
   // Mỗi việc quét = 1 coin trên 1 sàn. Sàn phụ được ghi tên ở cuối dòng.
   const jobs = coins.map(({ coin, min, max }) => ({
@@ -162,6 +164,10 @@ async function check(env, scheduledTime) {
         if (t.sell) { sell += t.value; nSell++; } else { buy += t.value; nBuy++; }
         maxV = Math.max(maxV, t.value);
       }
+      if (nBuy || nSell) {
+        const c = (tally[coin] ||= { b: 0, s: 0, nb: 0, ns: 0 });
+        c.b += buy; c.s += sell; c.nb += nBuy; c.ns += nSell;
+      }
       if (!nBuy && !nSell) return;
       const icon = maxV >= min * 5 ? '🐋' : '🦈';
       const lean = buy > sell * 2 ? 'GOM' : sell > buy * 2 ? 'XẢ' : 'giằng co';
@@ -183,6 +189,23 @@ async function check(env, scheduledTime) {
     blocks.sort((a, b) => b.total - a.total);
     await sendTelegram(env, blocks.map((b) => b.text).join('\n') +
       `\n<i>${vnTime(start)} · ${source}</i> · <a href="${SITE}">web</a>`);
+  }
+
+  try { await recordDay(storage, start, tally); } catch (e) { console.log('recordDay error:', e.message); }
+
+  // 7:00 sáng giờ VN: tổng kết gom/xả của ngày hôm qua (0h–24h).
+  const d0 = new Date(end);
+  if (d0.getUTCHours() === 0 && d0.getUTCMinutes() === 0) {
+    try {
+      const priceChange = async (coin, from, to) => {
+        if (!host) return null;
+        const k = await getJson(`${host}/api/v3/klines?symbol=${coin}USDT&interval=1h&startTime=${from}&endTime=${to - 1}&limit=24`);
+        return k.length ? (+k[k.length - 1][4] / +k[0][1] - 1) * 100 : null;
+      };
+      await sendTelegram(env, (await dailySummary(storage, coins, end, priceChange)) + ` · <a href="${SITE}">web</a>`);
+    } catch (e) {
+      await sendTelegram(env, `⚠️ Không tạo được bản tổng kết ngày: ${e.message}`);
+    }
   }
 
   // Báo lỗi tối đa 1 lần/giờ để không spam.
