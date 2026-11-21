@@ -10,7 +10,7 @@ const BINANCE_HOSTS = ['https://api-gcp.binance.com', 'https://api.binance.com',
 const OKX = 'https://www.okx.com/api/v5/market';
 const BYBIT = 'https://api.bybit.com/v5/market';
 const COINBASE = 'https://api.exchange.coinbase.com/products';
-const SITE = 'https://triphantotdigi.github.io/dca-tracker/#whale';
+const SITE = 'https://alfredphan.github.io/dca-tracker/#whale';
 const MAX_PAGES = 5;
 
 // Cron của Cloudflare chạy ở máy chủ ngẫu nhiên (hay ở Mỹ/châu Âu, nơi Binance và Bybit chặn).
@@ -199,7 +199,7 @@ async function check(env, scheduledTime) {
 }
 
 // Lịch unlock do GitHub Actions tạo mỗi giờ (data/unlocks.json trên website). Báo các đợt trong 3 ngày tới.
-const DATA_URL = 'https://triphantotdigi.github.io/dca-tracker/data/';
+const DATA_URL = 'https://alfredphan.github.io/dca-tracker/data/';
 const CAT_VI = {
   insiders: 'Đội ngũ & cố vấn', privateSale: 'Nhà đầu tư quỹ', publicSale: 'Bán công khai', airdrop: 'Airdrop',
   farming: 'Phần thưởng', noncirculating: 'Quỹ dự trữ', ecosystem: 'Hệ sinh thái', liquidity: 'Thanh khoản',

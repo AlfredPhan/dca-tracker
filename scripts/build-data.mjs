@@ -5,7 +5,7 @@
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 
 // Địa chỉ website của chính repo đang chạy (GitHub Actions có sẵn biến GITHUB_REPOSITORY = "chủ/tên-repo").
-const [GH_OWNER, GH_REPO] = (process.env.GITHUB_REPOSITORY || 'triphantotdigi/dca-tracker').split('/');
+const [GH_OWNER, GH_REPO] = (process.env.GITHUB_REPOSITORY || 'AlfredPhan/dca-tracker').split('/');
 const SITE = `https://${GH_OWNER.toLowerCase()}.github.io/${GH_REPO}/`;
 const OUT = new URL('../data/', import.meta.url);
 const UA = { 'user-agent': 'Mozilla/5.0 (dca-tracker data builder)', accept: 'application/json' };
