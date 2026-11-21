@@ -16,6 +16,7 @@ function refreshMarket(coin) {
   loadCvd(coin);
   loadEtf(coin);
   loadHistory(coin);
+  renderFng();
 }
 
 // ---------- CVD: dòng tiền chủ động cộng dồn ----------
@@ -351,6 +352,72 @@ async function loadHistory(coin) {
   bars.addEventListener('pointerdown', show);
 }
 
+// ---------- Chỉ số Sợ hãi & Tham lam (toàn thị trường crypto) ----------
+// Nguồn: Alternative.me (cập nhật mỗi ngày lúc 7:00 sáng giờ VN). 0 = sợ hãi tột độ, 100 = tham lam tột độ.
+const FNG_API = 'https://api.alternative.me/fng/?limit=31';
+const fngCache = { at: 0, data: null };
+async function loadFng() {
+  if (Date.now() - fngCache.at < 10 * 60000 && fngCache.data) return fngCache.data;
+  const d = await getJson(FNG_API);
+  fngCache.data = d.data.map((x) => ({ v: +x.value, t: +x.timestamp * 1000 })); // mới nhất trước
+  fngCache.at = Date.now();
+  return fngCache.data;
+}
+function fngInfo(v) {
+  if (v <= 24) return { name: 'Sợ hãi tột độ', color: '#f6465d', emoji: '😱', tip: 'Đám đông hoảng loạn bán tháo. Trong quá khứ đây thường là vùng tốt để <b>DCA dần</b> (mua từng phần, không dồn hết vốn), vì giá đã bị bán quá mức.' };
+  if (v <= 44) return { name: 'Sợ hãi', color: '#f7931a', emoji: '😟', tip: 'Thị trường còn e dè. Có thể tiếp tục DCA theo kế hoạch, ưu tiên mua ở các vùng hỗ trợ.' };
+  if (v <= 55) return { name: 'Trung lập', color: '#8b939e', emoji: '😐', tip: 'Tâm lý cân bằng, chưa nghiêng hẳn về bên nào.' };
+  if (v <= 75) return { name: 'Tham lam', color: '#7ccf8a', emoji: '🙂', tip: 'Đám đông bắt đầu hưng phấn. Không nên mua đuổi, giữ kỷ luật DCA.' };
+  return { name: 'Tham lam tột độ', color: '#0ecb81', emoji: '🤑', tip: 'Đám đông quá hưng phấn, dễ có điều chỉnh mạnh. Cân nhắc <b>chốt lời một phần</b> và tạm dừng mua đuổi.' };
+}
+
+function fngGauge(v, color) {
+  // Nửa vòng tròn 5 màu, kim chỉ vào giá trị.
+  const seg = [[0, 25, '#f6465d'], [25, 45, '#f7931a'], [45, 55, '#8b939e'], [55, 75, '#7ccf8a'], [75, 100, '#0ecb81']];
+  const pt = (x, r) => { const a = Math.PI * (1 - x / 100); return [(60 + r * Math.cos(a)).toFixed(2), (60 - r * Math.sin(a)).toFixed(2)]; };
+  const arcs = seg.map(([a, b, c]) => { const [x1, y1] = pt(a, 48), [x2, y2] = pt(b, 48);
+    return `<path d="M${x1} ${y1} A48 48 0 0 1 ${x2} ${y2}" stroke="${c}" stroke-width="10" fill="none"/>`; }).join('');
+  const [nx, ny] = pt(v, 40);
+  return `<svg class="fnggauge" viewBox="0 0 120 68">${arcs}
+    <line x1="60" y1="60" x2="${nx}" y2="${ny}" stroke="var(--text)" stroke-width="3" stroke-linecap="round"/>
+    <circle cx="60" cy="60" r="4" fill="var(--text)"/></svg>`;
+}
+
+async function renderFng() {
+  const el = $('#wFng');
+  if (!el) return;
+  try {
+    const d = await loadFng();
+    const now = d[0], info = fngInfo(now.v);
+    const ago = (i, label) => d[i] ? `<div><span class="muted small">${label}</span><b style="color:${fngInfo(d[i].v).color}">${d[i].v}</b></div>` : '';
+    el.innerHTML = `
+      <div class="fngbox">
+        <div class="fngleft">${fngGauge(now.v, info.color)}
+          <div class="fngval" style="color:${info.color}">${now.v}</div>
+          <div class="fngname" style="color:${info.color}">${info.emoji} ${info.name}</div></div>
+        <div class="fngright">
+          <div class="fngago">${ago(1, 'Hôm qua')}${ago(7, '7 ngày trước')}${ago(30, '30 ngày trước')}</div>
+          ${sparkline(d.slice().reverse().map((x) => x.v))}
+        </div>
+      </div>
+      <p class="verdictline">${info.tip}</p>
+      <p class="hint">Chỉ số đo tâm lý chung của thị trường crypto (biến động, khối lượng, mạng xã hội, tỷ trọng BTC…), cập nhật mỗi ngày.
+        Nguồn: <a href="https://alternative.me/crypto/fear-and-greed-index/" target="_blank" rel="noopener">Alternative.me</a>.</p>`;
+  } catch {
+    el.innerHTML = '<span class="down small">Không tải được chỉ số.</span>';
+  }
+}
+
+// Dòng ngắn cho tab Danh mục (đặt trên phần gợi ý vùng mua DCA).
+async function renderFngLine() {
+  const el = $('#dcaFng');
+  if (!el) return;
+  try {
+    const v = (await loadFng())[0].v, info = fngInfo(v);
+    el.innerHTML = `Tâm lý thị trường hôm nay: <b style="color:${info.color}">${info.emoji} ${v} · ${info.name}</b>. ${info.tip}`;
+  } catch { el.innerHTML = ''; }
+}
+
 // ---------- Gợi ý vùng mua DCA (tab Danh mục) ----------
 // Dùng các mức Pivot (pivot.js: loadPivotCoin, pv.data, MAIN_LEVELS, PIV_FRAMES) nằm dưới giá hiện tại.
 // Các mức sát nhau (≤1.5%) gộp thành một vùng; khung lớn hơn nặng ký hơn: ngày 1, tuần 2, tháng 3, năm 4 điểm.
@@ -390,6 +457,7 @@ function dcaFresh(coin) {
 async function renderDcaZones(hs) {
   const el = $('#dcaZones');
   if (!el || typeof loadPivotCoin !== 'function') return;
+  renderFngLine();
   const held = hs.filter((h) => h.qty > 0 && h.coin !== 'USDT' && prices[h.coin]);
   const coins = held.length ? held.map((h) => h.coin) : DCA_FALLBACK;
   const missing = coins.filter((c) => !dcaFresh(c));

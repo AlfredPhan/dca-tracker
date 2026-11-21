@@ -243,7 +243,7 @@ async function check(env, scheduledTime, storage) {
   };
   for (const p of periods) {
     try {
-      const etf = p.kind === 'ngày' ? await etfLine().catch(() => '') : '';
+      const etf = p.kind === 'ngày' ? (await fngLine().catch(() => '')) + (await etfLine().catch(() => '')) : '';
       await sendTelegram(env, (await periodSummary(storage, coins, p, priceChange)) + etf + ` · <a href="${SITE}">web</a>`);
     } catch (e) {
       await sendTelegram(env, `⚠️ Không tạo được bản tổng kết ${p.kind}: ${e.message}`);
@@ -272,6 +272,14 @@ const CAT_VI = {
   farming: 'Phần thưởng', noncirculating: 'Quỹ dự trữ', ecosystem: 'Hệ sinh thái', liquidity: 'Thanh khoản',
 };
 const fmtBig = (n) => n >= 1e9 ? (n / 1e9).toFixed(2) + 'B' : n >= 1e6 ? (n / 1e6).toFixed(2) + 'M' : n >= 1e3 ? (n / 1e3).toFixed(1) + 'K' : String(Math.round(n));
+
+// Chỉ số Sợ hãi & Tham lam (Alternative.me), gắn vào bản tổng kết ngày.
+async function fngLine() {
+  const d = (await getJson('https://api.alternative.me/fng/?limit=2')).data;
+  const v = +d[0].value, prev = d[1] ? +d[1].value : null;
+  const [emoji, name] = v <= 24 ? ['😱', 'Sợ hãi tột độ'] : v <= 44 ? ['😟', 'Sợ hãi'] : v <= 55 ? ['😐', 'Trung lập'] : v <= 75 ? ['🙂', 'Tham lam'] : ['🤑', 'Tham lam tột độ'];
+  return `\n${emoji} <b>Sợ hãi & Tham lam</b>: ${v} (${name})${prev != null ? `, hôm qua ${prev}` : ''}`;
+}
 
 // Dòng tiền quỹ ETF phiên Mỹ gần nhất (data/etf.json, nguồn Farside), gắn vào bản tổng kết ngày.
 async function etfLine() {

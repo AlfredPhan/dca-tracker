@@ -313,3 +313,14 @@ label.inline input { width: 110px; }
 .histbars i.b { bottom: 50%; background: var(--up); }
 .histbars i.s { top: 50%; background: var(--down); }
 .histbars span:hover i { filter: brightness(1.2); }
+
+/* ---------- Sợ hãi & Tham lam ---------- */
+.fngbox { display: grid; grid-template-columns: 180px 1fr; gap: 16px; align-items: center; }
+.fngleft { text-align: center; }
+.fnggauge { width: 160px; height: 92px; display: block; margin: 0 auto; }
+.fngval { font-size: 2rem; font-weight: 800; line-height: 1; margin-top: -6px; }
+.fngname { font-weight: 650; margin-top: 2px; }
+.fngago { display: flex; gap: 18px; margin-bottom: 6px; }
+.fngago div { display: flex; flex-direction: column; }
+.fngago b { font-size: 1.15rem; }
+@media (max-width: 760px) { .fngbox { grid-template-columns: 1fr; gap: 8px; } }
