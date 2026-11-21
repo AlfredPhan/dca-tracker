@@ -86,15 +86,21 @@ async function binanceTrades(host, coin, start, end) {
   const base = `${host}/api/v3/aggTrades?symbol=${coin}USDT`;
   let url = `${base}&startTime=${start}&endTime=${end - 1}&limit=1000`;
   const all = [];
+  let cut = true; // true nếu phút quá sôi động, đã hết MAX_PAGES trang mà chưa lấy đủ
   for (let i = 0; i < MAX_PAGES; i++) {
     const page = await getJson(url);
     all.push(...page);
-    if (page.length < 1000 || page[page.length - 1].T >= end - 1) break;
+    if (page.length < 1000 || page[page.length - 1].T >= end - 1) { cut = false; break; }
     url = `${base}&fromId=${page[page.length - 1].a + 1}&limit=1000`;
   }
-  return all.filter((t) => t.T >= start && t.T < end)
+  const out = all.filter((t) => t.T >= start && t.T < end)
     .map((t) => ({ price: +t.p, value: +t.p * +t.q, sell: t.m, time: t.T }));
+  out.cut = cut;
+  return out;
 }
+
+// Tổng mua/bán chủ động của mọi lệnh từ 100 USD trở lên (chỉ để vẽ biểu đồ trên web, không gửi tin nhắn).
+const ALL_MIN = 100;
 
 async function okxTrades(coin, start, end) {
   const inst = `${coin}-USDT`;
@@ -183,6 +189,17 @@ async function check(env, scheduledTime, storage) {
       if (nBuy || nSell) {
         const c = (tally[coin] ||= { b: 0, s: 0, nb: 0, ns: 0 });
         c.b += buy; c.s += sell; c.nb += nBuy; c.ns += nSell;
+      }
+      // Sàn chính Binance: cộng thêm tổng mọi lệnh từ 100 USD (ab/as = mua/bán, anb/ans = số lệnh, acut = số phút bị thiếu).
+      if (!label && host) {
+        const c = (tally[coin] ||= { b: 0, s: 0, nb: 0, ns: 0 });
+        c.ab ||= 0; c.as ||= 0; c.anb ||= 0; c.ans ||= 0; c.acut ||= 0;
+        c.amin = (c.amin || 0) + 1; // số phút đã ghi (để biết ngày nào đủ 24 giờ)
+        for (const t of trades) {
+          if (t.value < ALL_MIN) continue;
+          if (t.sell) { c.as += t.value; c.ans++; } else { c.ab += t.value; c.anb++; }
+        }
+        if (trades.cut) c.acut++;
       }
       if (!nBuy && !nSell) return;
       const icon = maxV >= min * 5 ? '🐋' : '🦈';

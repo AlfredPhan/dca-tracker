@@ -23,7 +23,8 @@ export async function recordDay(storage, start, tally) {
   d.runs++;
   for (const [coin, t] of Object.entries(tally)) {
     const c = (d.coins[coin] ||= { b: 0, s: 0, nb: 0, ns: 0 });
-    c.b += t.b; c.s += t.s; c.nb += t.nb; c.ns += t.ns;
+    // Cộng mọi trường số: b/s/nb/ns = lệnh lớn (bot báo), ab/as/anb/ans/acut = mọi lệnh từ 100 USD (cho web).
+    for (const [k, v] of Object.entries(t)) c[k] = (c[k] || 0) + v;
   }
   await storage.put(key, d);
 }
