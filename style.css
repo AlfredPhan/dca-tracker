@@ -279,3 +279,16 @@ button, input, select, .tab { -webkit-tap-highlight-color: transparent; touch-ac
 .caltips summary { cursor: pointer; font-weight: 600; }
 .caltips p { margin: 6px 0; }
 @media (max-width: 760px) { .calrow { grid-template-columns: 46px 1fr; } .calnum { grid-column: 2; text-align: left; } }
+
+/* ---------- ETF ---------- */
+.etfhead { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-bottom: 6px; }
+.etfbig { font-size: 1.35rem; font-weight: 700; font-variant-numeric: tabular-nums; }
+.etfmid { font-size: 1rem; font-weight: 650; font-variant-numeric: tabular-nums; }
+.etfbars { position: relative; display: flex; align-items: stretch; gap: 2px; height: 120px; margin-top: 8px; }
+.etfbars::before { content: ""; position: absolute; left: 0; right: 0; top: 50%; border-top: 1px dashed var(--border); }
+.etfbars span { flex: 1; position: relative; cursor: pointer; }
+.etfbars span::after { content: ""; position: absolute; left: 0; right: 0; height: var(--h); border-radius: 2px; }
+.etfbars span.pos::after { bottom: 50%; background: var(--up); }
+.etfbars span.neg::after { top: 50%; background: var(--down); }
+.etfbars span:hover::after { filter: brightness(1.2); outline: 1px solid var(--text); }
+@media (max-width: 760px) { .etfhead { grid-template-columns: repeat(2, 1fr); } .etfbig { font-size: 1.15rem; } }

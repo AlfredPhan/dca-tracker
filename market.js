@@ -14,6 +14,7 @@ function startMarket(coin) {
 function refreshMarket(coin) {
   if (mk.coin !== coin) startMarket(coin);
   loadCvd(coin);
+  loadEtf(coin);
 }
 
 // ---------- CVD: dòng tiền chủ động cộng dồn ----------
@@ -225,6 +226,56 @@ function renderLiq(status) {
     </div>
     <p class="hint">Chỉ tính từ lúc mở trang. Binance chỉ gửi tối đa 1 lệnh thanh lý mỗi giây cho mỗi cặp, nên con số thực tế thường lớn hơn.
       Coin không có futures trên Binance sẽ không có thanh lý.</p>`;
+}
+
+// ---------- Dòng tiền quỹ ETF Bitcoin/Ethereum (Mỹ) ----------
+// data/etf.json do GitHub Actions tạo từ bảng công khai của Farside Investors (triệu USD mỗi phiên).
+const ETF_BARS = 30;
+const ETF_NAMES = { IBIT: 'BlackRock', ETHA: 'BlackRock', FBTC: 'Fidelity', FETH: 'Fidelity', GBTC: 'Grayscale', ETHE: 'Grayscale',
+  BTC: 'Grayscale Mini', ETH: 'Grayscale Mini', ARKB: 'ARK', BITB: 'Bitwise', ETHW: 'Bitwise', HODL: 'VanEck', ETHV: 'VanEck' };
+const etfM = (v) => `${v >= 0 ? '+' : '−'}$${Math.abs(v) >= 1000 ? (Math.abs(v) / 1000).toFixed(2) + 'B' : Math.abs(v).toFixed(1) + 'M'}`;
+
+async function loadEtf(coin) {
+  const card = $('#wEtfCard');
+  if (coin !== 'BTC' && coin !== 'ETH') { card.hidden = true; return; }
+  card.hidden = false;
+  const data = await loadData('etf.json');
+  if (mk.coin !== coin) return;
+  const days = data?.coins?.[coin];
+  if (!days?.length) { $('#wEtf').innerHTML = '<span class="muted small">Chưa có dữ liệu ETF (đang được tạo, thử lại sau ít phút).</span>'; return; }
+
+  const last = days[days.length - 1];
+  const sum = (n) => days.slice(-n).reduce((s, x) => s + x.total, 0);
+  let streak = 0;
+  for (let i = days.length - 1; i >= 0 && last.total && Math.sign(days[i].total) === Math.sign(last.total); i--) streak++;
+  const s5 = sum(5), s20 = sum(20);
+  const top = Object.entries(last.funds).sort((a, b) => Math.abs(b[1]) - Math.abs(a[1])).slice(0, 3)
+    .map(([k, v]) => `${k}${ETF_NAMES[k] ? ` <span class="muted">(${ETF_NAMES[k]})</span>` : ''} <b class="${cls(v)}">${etfM(v)}</b>`).join(' · ');
+  const verdict = s5 > 0 && s20 > 0 ? ['up', `✅ Quỹ ETF đang <b>mua vào</b> đều đặn: cả 5 phiên và 20 phiên đều vào ròng. Dòng tiền tổ chức ủng hộ giá ${coin}.`]
+    : s5 < 0 && s20 < 0 ? ['down', `⚠️ Quỹ ETF đang <b>rút tiền</b> liên tục: cả 5 phiên và 20 phiên đều ra ròng. Đây thường là lý do giá ${coin} giảm kéo dài.`]
+    : s5 > 0 ? ['up', '🔄 Gần đây dòng tiền ETF <b>quay lại vào</b> sau giai đoạn rút ra. Theo dõi thêm vài phiên để xác nhận.']
+    : ['down', '🔄 Gần đây dòng tiền ETF <b>chuyển sang rút</b> sau giai đoạn vào ròng. Cần cẩn thận.'];
+
+  const bars = days.slice(-ETF_BARS), max = Math.max(...bars.map((x) => Math.abs(x.total)), 1);
+  const dfmt = (d) => `${d.slice(8, 10)}/${d.slice(5, 7)}`;
+  $('#wEtf').innerHTML = `
+    <div class="etfhead">
+      <div><span class="muted small">Phiên ${dfmt(last.d)}</span><div class="etfbig ${cls(last.total)}">${etfM(last.total)}</div></div>
+      <div><span class="muted small">5 phiên</span><div class="etfmid ${cls(s5)}">${etfM(s5)}</div></div>
+      <div><span class="muted small">20 phiên</span><div class="etfmid ${cls(s20)}">${etfM(s20)}</div></div>
+      <div><span class="muted small">Liên tiếp</span><div class="etfmid ${cls(last.total)}">${streak} phiên ${last.total >= 0 ? 'vào' : 'rút'}</div></div>
+    </div>
+    ${top ? `<p class="hint">Phiên ${dfmt(last.d)}: ${top}</p>` : ''}
+    <div class="etfbars">${bars.map((x) => `<span class="${x.total >= 0 ? 'pos' : 'neg'}" style="--h:${(Math.abs(x.total) / max * 50).toFixed(1)}%" data-tip="${dfmt(x.d)}: ${etfM(x.total)}"></span>`).join('')}</div>
+    <div class="row between small muted"><span>${dfmt(bars[0].d)}</span><span id="wEtfTip">Chạm vào cột để xem số</span><span>${dfmt(last.d)}</span></div>
+    <p class="verdictline ${verdict[0]}">${verdict[1]}</p>
+    <p class="hint">Số tiền các quỹ ETF ${coin} spot ở Mỹ nhận vào (+) hoặc bị rút ra (−) mỗi phiên, gồm BlackRock, Fidelity, Grayscale…
+      Số của phiên Mỹ thường có vào tối hoặc sáng hôm sau giờ Việt Nam. Nguồn: <a href="https://farside.co.uk/${coin.toLowerCase()}/" target="_blank" rel="noopener">Farside Investors</a>.</p>`;
+  const tip = $('#wEtfTip');
+  const bar = $('#wEtf .etfbars');
+  const show = (e) => { if (e.target.dataset.tip) tip.textContent = e.target.dataset.tip; };
+  bar.addEventListener('pointerover', show);
+  bar.addEventListener('pointerdown', show);
 }
 
 // ---------- Lịch tin kinh tế Mỹ (tab Vàng) ----------

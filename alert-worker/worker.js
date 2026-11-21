@@ -229,7 +229,8 @@ async function check(env, scheduledTime, storage) {
   };
   for (const p of periods) {
     try {
-      await sendTelegram(env, (await periodSummary(storage, coins, p, priceChange)) + ` · <a href="${SITE}">web</a>`);
+      const etf = p.kind === 'ngày' ? await etfLine().catch(() => '') : '';
+      await sendTelegram(env, (await periodSummary(storage, coins, p, priceChange)) + etf + ` · <a href="${SITE}">web</a>`);
     } catch (e) {
       await sendTelegram(env, `⚠️ Không tạo được bản tổng kết ${p.kind}: ${e.message}`);
     }
@@ -257,6 +258,19 @@ const CAT_VI = {
   farming: 'Phần thưởng', noncirculating: 'Quỹ dự trữ', ecosystem: 'Hệ sinh thái', liquidity: 'Thanh khoản',
 };
 const fmtBig = (n) => n >= 1e9 ? (n / 1e9).toFixed(2) + 'B' : n >= 1e6 ? (n / 1e6).toFixed(2) + 'M' : n >= 1e3 ? (n / 1e3).toFixed(1) + 'K' : String(Math.round(n));
+
+// Dòng tiền quỹ ETF phiên Mỹ gần nhất (data/etf.json, nguồn Farside), gắn vào bản tổng kết ngày.
+async function etfLine() {
+  const data = await getJson(DATA_URL + 'etf.json');
+  const m = (v) => `${v >= 0 ? '+' : '−'}$${Math.abs(v) >= 1000 ? (Math.abs(v) / 1000).toFixed(2) + 'B' : Math.abs(v).toFixed(1) + 'M'}`;
+  const parts = ['BTC', 'ETH'].map((c) => {
+    const d = data.coins?.[c];
+    if (!d?.length) return '';
+    const last = d[d.length - 1], s5 = d.slice(-5).reduce((s, x) => s + x.total, 0);
+    return `${c} ${m(last.total)} (5 phiên ${m(s5)}) · phiên ${last.d.slice(8, 10)}/${last.d.slice(5, 7)}`;
+  }).filter(Boolean);
+  return parts.length ? `\n🏦 <b>Quỹ ETF</b>: ${parts.join(' | ')}` : '';
+}
 
 async function unlockReminder(symbols) {
   const data = await getJson(DATA_URL + 'unlocks.json');

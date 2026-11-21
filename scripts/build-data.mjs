@@ -371,6 +371,65 @@ async function buildCalendar() {
   return { updated: now, events, fomc, coins: {} };
 }
 
+// ---------- Dòng tiền quỹ ETF Bitcoin/Ethereum spot (Mỹ) ----------
+// Nguồn: bảng công khai của Farside Investors (đơn vị triệu USD, số âm ghi trong ngoặc). Chỉ lưu số theo ngày, ghi nguồn trên web.
+const FARSIDE = { BTC: 'https://farside.co.uk/btc/', ETH: 'https://farside.co.uk/eth/' }; // ~15 ngày gần nhất
+// Trang toàn bộ lịch sử (nặng hơn), chỉ tải khi bản đã lưu chưa đủ lịch sử.
+const FARSIDE_ALL = { BTC: 'https://farside.co.uk/bitcoin-etf-flow-all-data/', ETH: 'https://farside.co.uk/ethereum-etf-flow-all-data/' };
+const MON3 = { Jan: 0, Feb: 1, Mar: 2, Apr: 3, May: 4, Jun: 5, Jul: 6, Aug: 7, Sep: 8, Oct: 9, Nov: 10, Dec: 11 };
+
+function farsideNum(s) {
+  s = s.replace(/,/g, '').trim();
+  if (!s || s === '-') return s === '-' ? 0 : null;
+  const neg = /^\(.*\)$/.test(s);
+  const v = parseFloat(s.replace(/[()]/g, ''));
+  return isFinite(v) ? (neg ? -v : v) : null;
+}
+
+async function farsideTable(url) {
+  const res = await fetch(url, { headers: { 'user-agent': 'dca-tracker data builder' } });
+  if (!res.ok) throw new Error('HTTP ' + res.status);
+  const html = await res.text();
+  const cells = (row) => [...row.matchAll(/<t[dh][^>]*>([\s\S]*?)<\/t[dh]>/g)]
+    .map((c) => c[1].replace(/<[^>]+>/g, '').replace(/&nbsp;/g, ' ').trim());
+  const rows = [...html.matchAll(/<tr[^>]*>([\s\S]*?)<\/tr>/g)].map((m) => cells(m[1]));
+  const head = rows.find((r) => r.some((c) => /^(IBIT|ETHA)$/.test(c)));
+  if (!head) throw new Error('không thấy hàng tên quỹ');
+  const days = [];
+  for (const r of rows) {
+    const m = r[0]?.match(/^(\d{1,2}) ([A-Z][a-z]{2}) (\d{4})$/);
+    if (!m) continue;
+    const total = farsideNum(r[r.length - 1]);
+    if (total == null) continue; // hôm nay chưa có số
+    const funds = {};
+    head.forEach((name, i) => { if (i > 0 && i < r.length - 1 && /^[A-Z]{3,5}$/.test(name)) { const v = farsideNum(r[i]); if (v) funds[name] = v; } });
+    days.push({ d: new Date(Date.UTC(+m[3], MON3[m[2]], +m[1])).toISOString().slice(0, 10), total, funds });
+  }
+  if (!days.length) throw new Error('không đọc được dòng nào');
+  return days.sort((a, b) => (a.d < b.d ? -1 : 1));
+}
+
+async function buildEtf() {
+  const prev = await previous('etf.json');
+  const out = { updated: Date.now(), source: 'Farside Investors (farside.co.uk)', coins: {} };
+  for (const [coin, url] of Object.entries(FARSIDE)) {
+    try {
+      const fresh = await farsideTable((prev?.coins?.[coin]?.length || 0) < 100 ? FARSIDE_ALL[coin] : url);
+      // Gộp với bản cũ để giữ lịch sử dài hơn bảng trên trang (bản mới ghi đè ngày trùng).
+      const map = new Map((prev?.coins?.[coin] || []).map((x) => [x.d, x]));
+      for (const x of fresh) map.set(x.d, x);
+      out.coins[coin] = [...map.values()].sort((a, b) => (a.d < b.d ? -1 : 1)).slice(-400);
+      const last = out.coins[coin].at(-1);
+      console.log(`etf ${coin}: ${fresh.length} ngày trên trang, lưu ${out.coins[coin].length} ngày, mới nhất ${last.d} = ${last.total}M`);
+    } catch (e) {
+      console.error(`etf ${coin} lỗi: ${e.message}, giữ bản cũ`);
+      if (prev?.coins?.[coin]) out.coins[coin] = prev.coins[coin];
+    }
+  }
+  if (!Object.keys(out.coins).length) throw new Error('không có dữ liệu ETF');
+  return out;
+}
+
 // ---------- Chạy ----------
 const previous = (name) => getJson(SITE + 'data/' + name).catch(() => null);
 await mkdir(OUT, { recursive: true });
@@ -393,3 +452,4 @@ const prevOnchain = await previous('onchain.json');
 await save('onchain.json', () => buildOnchain(prevOnchain));
 await save('gold.json', buildGold);
 await save('calendar.json', buildCalendar);
+await save('etf.json', buildEtf);
