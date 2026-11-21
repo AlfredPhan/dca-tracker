@@ -336,6 +336,15 @@ async function loadHistory(coin) {
     : pct <= 40 ? ['down', `🔴 Tổng cộng lệnh lớn <b>XẢ</b> nhiều hơn (${(100 - pct).toFixed(0)}% là bán).`]
     : ['muted', `⚪ Lệnh lớn mua và bán khá cân bằng (${pct.toFixed(0)}% mua).`];
   const sUsd = (v) => fmtUsdShort(v);
+  if (!tb && !ts) {
+    // Chưa có lệnh lớn nào của coin này trong khoảng đang xem: giải thích thay vì vẽ khung trống.
+    const t = (ms) => new Date(ms).toLocaleString('vi-VN', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit' });
+    const first = data.days.find((x) => x.first)?.first;
+    el.innerHTML = `<p class="hint">📭 ${first ? `Từ lúc bot bắt đầu ghi (${t(first)})` : `Trong ${list.length} ${unit} gần nhất`} đến lần cập nhật gần nhất (${t(data.updated)}),
+      <b>${esc(coin)}</b> chưa có lệnh nào từ ${fmtUsdShort(min)} trở lên, nên chưa có cột nào.</p>
+      <p class="hint">Đây là bình thường với coin ít giao dịch hoặc lúc thị trường vắng. Khi có lệnh lớn, bot sẽ báo qua Telegram và cột sẽ hiện ở đây (web cập nhật số của bot mỗi giờ).</p>`;
+    return;
+  }
   el.innerHTML = `
     <div class="histbars">${list.map((g) => `<span class="${g.k === curKey ? 'cur' : ''}"
         data-tip="${histLabel(g.k, f)}${g.k === curKey ? ' (đang chạy)' : ''}: mua ${sUsd(g.b)} (${g.nb}) · bán ${sUsd(g.s)} (${g.ns}) · ròng ${g.b - g.s >= 0 ? '+' : ''}${sUsd(g.b - g.s)}">

@@ -444,7 +444,7 @@ async function buildHistory() {
   if (!url) throw new Error('chưa có secret BOT_HISTORY_URL');
   const d = await getJson(url);
   const days = Object.entries(d.days || {})
-    .map(([k, v]) => ({ d: k.replace('day:', ''), runs: v.runs, coins: v.coins }))
+    .map(([k, v]) => ({ d: k.replace('day:', ''), runs: v.runs, first: v.first, coins: v.coins }))
     .sort((a, b) => (a.d < b.d ? -1 : 1));
   if (!days.length) throw new Error('bot chưa có dữ liệu ngày nào');
   console.log(`history: ${days.length} ngày (${days[0].d} → ${days.at(-1).d}), ${d.coins.length} coin`);
