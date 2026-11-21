@@ -1,0 +1,288 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="DCA Tracker">
+  <meta name="theme-color" content="#f5f6f8" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#181c22" media="(prefers-color-scheme: dark)">
+  <title>Altcoin DCA Tracker</title>
+  <link rel="stylesheet" href="style.css?v=202611191500">
+</head>
+<body>
+  <header class="topbar">
+    <h1>📈 Altcoin DCA Tracker</h1>
+    <div class="actions">
+      <span id="priceStatus" class="muted">Đang tải giá…</span>
+      <button id="refreshBtn" class="ghost" title="Cập nhật giá">⟳</button>
+      <button id="exportBtn" class="ghost">Xuất</button>
+      <label class="ghost btnlike">Nhập<input id="importFile" type="file" accept=".json" hidden></label>
+      <button id="themeBtn" class="ghost" title="Đổi giao diện">◐</button>
+    </div>
+  </header>
+
+  <nav class="tabs">
+    <button class="tab active" data-tab="portfolio">💼 Danh mục</button>
+    <button class="tab" data-tab="whale">🐋 Cá voi</button>
+    <button class="tab" data-tab="gold">🥇 Vàng</button>
+    <button class="tab" data-tab="pivot">📐 Pivot</button>
+  </nav>
+
+  <main id="tab-whale" hidden>
+    <section class="card">
+      <div class="row wrap">
+        <label>Coin <input id="wCoin" list="coinList" placeholder="VD: SOL"></label>
+        <label>Lệnh lớn từ (USDT) <input id="wMin" type="number" inputmode="numeric" min="1000" step="1000" value="50000"></label>
+        <button id="wGo" class="primary">Theo dõi</button>
+        <div id="wSuggest" class="suggest"></div>
+      </div>
+      <div id="wQuick" class="chips"></div>
+      <p class="muted small">Dữ liệu từ sàn Binance (spot và futures), chỉ phản ánh một sàn. Đây là tín hiệu tham khảo, không phải lời khuyên đầu tư.</p>
+    </section>
+
+    <section class="card">
+      <h2>🧭 Tổng hợp tín hiệu cá voi</h2>
+      <div id="wScore"></div>
+    </section>
+
+    <section class="grid2">
+      <div class="card">
+        <h2>Gom hay xả? <span class="muted small">(dòng tiền mua/bán chủ động)</span></h2>
+        <div id="wFlow"></div>
+      </div>
+      <div class="card">
+        <h2>Long/Short của top trader <span class="muted small">(futures)</span></h2>
+        <div id="wLs"></div>
+      </div>
+    </section>
+
+    <section class="grid2">
+      <div class="card">
+        <h2>💸 Funding &amp; Open Interest <span class="muted small">(futures)</span></h2>
+        <div id="wFunding"></div>
+      </div>
+      <div class="card">
+        <h2>🔓 Lịch mở khóa token <span class="muted small">(unlock)</span></h2>
+        <div id="wUnlock"></div>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>⛓ Nạp/rút sàn <span class="muted small">(on-chain)</span></h2>
+      <div id="wOnchain"></div>
+    </section>
+
+    <section class="card">
+      <div class="row between"><h2>Lệnh lớn realtime</h2><span id="wLive" class="muted small"></span></div>
+      <div id="wBigStats"></div>
+      <div class="grid2">
+        <div>
+          <div class="sidehead up"><b>🟢 MUA</b><span id="wBuyTotal"></span></div>
+          <div class="tablewrap feed">
+            <table id="wFeedBuy">
+              <thead><tr><th>Giờ</th><th>Giá</th><th>Giá trị</th></tr></thead>
+              <tbody></tbody>
+            </table>
+          </div>
+        </div>
+        <div>
+          <div class="sidehead down"><b>🔴 BÁN</b><span id="wSellTotal"></span></div>
+          <div class="tablewrap feed">
+            <table id="wFeedSell">
+              <thead><tr><th>Giờ</th><th>Giá</th><th>Giá trị</th></tr></thead>
+              <tbody></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <div class="card">
+        <div class="row between"><h2>Tường lệnh (sổ lệnh ±10%)</h2><span id="wBookTime" class="muted small"></span></div>
+        <div id="wWalls"></div>
+      </div>
+    </section>
+  </main>
+
+  <main id="tab-gold" hidden>
+    <section class="card goldsum">
+      <div id="gSummary"><span class="muted small">Đang tải…</span></div>
+    </section>
+
+    <details class="more card">
+      <summary>📊 Xem chi tiết số liệu <span class="muted small">(giá, bảng điểm, báo cáo COT, vĩ mô, futures, lệnh lớn)</span></summary>
+      <section class="grid2">
+        <div class="card">
+          <h2>🥇 Giá vàng</h2>
+          <div id="gPrice"></div>
+        </div>
+        <div class="card">
+          <h2>🧭 Bảng chấm điểm</h2>
+          <div id="gScore"></div>
+        </div>
+      </section>
+
+    <section class="grid2">
+      <div class="card">
+        <h2>🏦 Quỹ lớn đang làm gì? <span class="muted small">(báo cáo COT, hàng tuần)</span></h2>
+        <div id="gCot"></div>
+      </div>
+      <div class="card">
+        <h2>🌎 Vĩ mô <span class="muted small">(lợi suất thực, đô la Mỹ)</span></h2>
+        <div id="gMacro"></div>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>💸 Futures vàng XAUUSDT <span class="muted small">(Binance: dòng tiền, long/short, funding)</span></h2>
+      <div id="gFut"></div>
+    </section>
+
+    <section class="card">
+      <div class="row between"><h2>Lệnh lớn realtime <span class="muted small">(XAUUSDT)</span></h2><span id="gLive" class="muted small"></span></div>
+      <div class="row wrap">
+        <label>Lệnh lớn từ (USDT) <input id="gMin" type="number" inputmode="numeric" min="10000" step="10000" value="100000"></label>
+        <button id="gApply" class="primary">Áp dụng</button>
+      </div>
+      <div id="gBigStats"></div>
+      <div class="grid2">
+        <div>
+          <div class="sidehead up"><b>🟢 MUA</b><span id="gBuyTotal"></span></div>
+          <div class="tablewrap feed"><table id="gFeedBuy"><thead><tr><th>Giờ</th><th>Giá</th><th>Giá trị</th></tr></thead><tbody></tbody></table></div>
+        </div>
+        <div>
+          <div class="sidehead down"><b>🔴 BÁN</b><span id="gSellTotal"></span></div>
+          <div class="tablewrap feed"><table id="gFeedSell"><thead><tr><th>Giờ</th><th>Giá</th><th>Giá trị</th></tr></thead><tbody></tbody></table></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>🔗 Nguồn tham khảo thêm</h2>
+      <ul class="links">
+        <li><a href="https://www.spdrgoldshares.com/usa/gld/" target="_blank" rel="noopener">Quỹ SPDR Gold (GLD)</a>: lượng vàng quỹ ETF lớn nhất đang giữ (tăng = dòng tiền tổ chức vào vàng)</li>
+        <li><a href="https://www.gold.org/goldhub/data/gold-reserves-by-country" target="_blank" rel="noopener">Hội đồng Vàng Thế giới</a>: ngân hàng trung ương mua/bán vàng</li>
+        <li><a href="https://www.cftc.gov/MarketReports/CommitmentsofTraders/index.htm" target="_blank" rel="noopener">CFTC</a>: báo cáo COT gốc</li>
+        <li><a href="https://www.forexfactory.com/calendar" target="_blank" rel="noopener">Lịch kinh tế</a>: CPI, Non-farm, họp Fed (các tin làm vàng biến động mạnh)</li>
+      </ul>
+    </section>
+    </details>
+  </main>
+
+  <main id="tab-pivot" hidden>
+    <section class="card" id="pvPick">
+      <div class="row between"><h2>📐 Pivot Point <span class="muted small">(Classic, giống "Traditional" trên TradingView)</span></h2>
+        <span id="pvTime" class="muted small"></span></div>
+      <div id="pvChips" class="chips"></div>
+      <div id="pvOverview" style="margin-top:10px"><span class="muted small">Đang tải…</span></div>
+    </section>
+
+    <section class="card" id="pvXau" hidden>
+      <h2>🎯 Căn theo giá Exness <span class="muted small">(tùy chọn)</span></h2>
+      <p class="hint">Giá vàng trên web lấy từ hợp đồng XAUUSDT của Binance (bỏ thứ Bảy, Chủ nhật cho khớp giờ Exness), thường lệch vài USD so với Exness.
+        Nhập giá XAUUSD bạn đang thấy trên Exness lúc này, web sẽ dịch tất cả các mức theo độ lệch đó.</p>
+      <div class="row wrap">
+        <label>Giá XAUUSD trên Exness <input id="pvXauInput" type="number" inputmode="decimal" step="0.01" placeholder="VD: 3745.20"></label>
+        <button id="pvXauSet" class="primary">Căn chỉnh</button>
+        <button id="pvXauReset" class="ghost" hidden>Bỏ căn chỉnh</button>
+      </div>
+      <p id="pvXauStatus" class="hint"></p>
+      <p class="muted small">Nên căn lại mỗi ngày một lần, vì độ lệch giữa hai nơi thay đổi chút ít theo thời gian. Độ lệch chỉ lưu trên trình duyệt này.</p>
+    </section>
+
+    <section id="pvDetail"></section>
+
+    <details class="more card">
+      <summary>📖 Cách đọc Pivot Point</summary>
+      <div class="pvguide">
+        <p><b>P</b> (điểm xoay) = (Cao + Thấp + Đóng cửa của kỳ trước) ÷ 3. Giá <b>trên P</b> thì phe mua chiếm ưu thế, <b>dưới P</b> thì phe bán chiếm ưu thế.</p>
+        <p><b>R1, R2, R3</b> là các mức kháng cự phía trên, <b>S1, S2, S3</b> là các mức hỗ trợ phía dưới. Mức nằm <b>dưới</b> giá là hỗ trợ, nằm <b>trên</b> giá là kháng cự; khi bị phá qua, mức đó đổi vai (hỗ trợ cũ thành kháng cự mới và ngược lại).</p>
+        <p>Chỉ tính là <b>thủng</b> khi <b>nến đóng cửa</b> qua mức đó, không tính râu nến. Thủng một mức thì giá thường hướng tới mức kế tiếp.</p>
+        <p><b>Khung càng lớn càng mạnh:</b> Ngày cho giao dịch trong ngày, Tuần cho vài ngày đến vài tuần, Tháng và Năm cho DCA và giữ dài hạn. Vùng <b>🎯 hội tụ</b> (nhiều khung trùng nhau) thường mạnh nhất.</p>
+        <p>Kỳ mới bắt đầu theo giờ chốt nến của Binance: ngày mới lúc <b>7:00 sáng</b> giờ Việt Nam, tuần mới sáng <b>thứ Hai</b>, tháng mới ngày <b>1</b>, năm mới ngày <b>1/1</b>. Web tự tính lại khi sang kỳ mới.</p>
+        <p class="muted small">Coin: dữ liệu spot Binance. Vàng: hợp đồng XAUUSDT của Binance, bỏ nến thứ Bảy và Chủ nhật cho khớp giờ giao dịch của Exness (khung năm 2025 dùng PAXG vì XAUUSDT mới có từ 12/2025). Mức trên sàn khác có thể lệch chút ít. Tham khảo, không phải lời khuyên đầu tư.</p>
+      </div>
+    </details>
+  </main>
+
+  <main id="tab-portfolio">
+    <section class="summary" id="summary"></section>
+
+    <section class="grid2">
+      <div class="card">
+        <h2 id="formTitle">Thêm lệnh</h2>
+        <form id="txForm" autocomplete="off">
+          <div class="seg">
+            <input type="radio" name="side" id="sideBuy" value="buy" checked><label for="sideBuy">Mua</label>
+            <input type="radio" name="side" id="sideSell" value="sell"><label for="sideSell">Bán</label>
+          </div>
+          <label>Coin <input id="fCoin" list="coinList" placeholder="VD: SOL" required></label>
+          <datalist id="coinList"></datalist>
+          <div class="row">
+            <label>Giá (USDT) <input id="fPrice" type="number" inputmode="decimal" step="any" min="0" required></label>
+            <label id="amountLabel">Số vốn (USDT) <input id="fAmount" type="number" inputmode="decimal" step="any" min="0" required></label>
+          </div>
+          <div class="row">
+            <label>Ngày <input id="fDate" type="date"></label>
+            <label>Ghi chú <input id="fNote" placeholder="tùy chọn"></label>
+          </div>
+          <p class="hint" id="fPreview"></p>
+          <div class="row">
+            <button type="submit" class="primary" id="submitBtn">Thêm lệnh</button>
+            <button type="button" class="ghost" id="cancelEdit" hidden>Hủy sửa</button>
+          </div>
+        </form>
+      </div>
+
+      <div class="card">
+        <h2>Mô phỏng DCA</h2>
+        <label>Coin <select id="sCoin"></select></label>
+        <div class="row">
+          <label>Mua thêm (USDT) <input id="sAmount" type="number" inputmode="decimal" step="any" min="0"></label>
+          <label>Ở giá <input id="sPrice" type="number" inputmode="decimal" step="any" min="0"></label>
+        </div>
+        <div id="simResult" class="hint"></div>
+        <h2 style="margin-top:1rem">Tỷ trọng</h2>
+        <div id="pie" class="pie"></div>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>Danh mục</h2>
+      <div class="tablewrap">
+        <table id="portfolio">
+          <thead><tr>
+            <th>Coin</th><th>Số lượng</th><th>Vốn còn</th><th>Giá DCA</th><th>Giá hiện tại</th>
+            <th>Giá trị</th><th>Lãi/lỗ</th><th>Đã chốt</th>
+          </tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+      <p class="muted small">Bấm vào một coin để xem lịch sử lệnh của coin đó.</p>
+    </section>
+
+    <section class="card">
+      <div class="row between">
+        <h2>Lịch sử lệnh <span id="histFilter" class="muted"></span></h2>
+        <button id="clearFilter" class="ghost" hidden>Xem tất cả</button>
+      </div>
+      <div class="tablewrap">
+        <table id="history">
+          <thead><tr><th>Ngày</th><th>Coin</th><th>Loại</th><th>Giá</th><th>Số lượng</th><th>USDT</th><th>Ghi chú</th><th></th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </section>
+  </main>
+
+  <footer class="muted small">Dữ liệu chỉ lưu trên trình duyệt này. Nhớ bấm “Xuất” để sao lưu. Giá lấy từ Binance.</footer>
+  <script src="app.js?v=202611191500"></script>
+  <script src="whale.js?v=202611191500"></script>
+  <script src="gold.js?v=202611191500"></script>
+  <script src="pivot.js?v=202611191500"></script>
+</body>
+</html>

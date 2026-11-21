@@ -1,0 +1,25 @@
+name = "whale-alert"
+main = "worker.js"
+compatibility_date = "2026-11-01"
+workers_dev = false # bot chỉ chạy theo lịch, không cần link workers.dev
+
+[observability]
+enabled = true # xem log trong dashboard: whale-alert > Observability
+
+# Durable Object chạy việc quét, ghim ở châu Á để không bị Binance/Bybit chặn.
+[[durable_objects.bindings]]
+name = "SCANNER"
+class_name = "Scanner"
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["Scanner"]
+
+[triggers]
+crons = ["* * * * *"] # chạy mỗi phút
+
+[vars]
+# Coin:ngưỡng (USDT), cách nhau bằng dấu phẩy. Sửa xong chạy lại: npx wrangler deploy
+COINS ="BTC:500000,ETH:500000,ARB:10000,APT:10000,FET:10000,OP:10000,TIA:10000,LDO:10000,BICO:10000"
+# Quét thêm sàn phụ cho coin giao dịch mạnh ở sàn khác (bybit, coinbase, okx). Ngưỡng lấy theo COINS.
+EXTRA = "TIA:bybit,FET:coinbase"
