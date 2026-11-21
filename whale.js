@@ -68,6 +68,7 @@ async function startWhale(coin) {
   $('#wFeedSell tbody').innerHTML = '';
   ['#wScore', '#wFlow', '#wFunding', '#wUnlock', '#wOnchain', '#wBigStats', '#wLs', '#wWalls'].forEach((s) => { $(s).innerHTML = '<span class="muted small">Đang tải…</span>'; });
 
+  if (typeof startMarket === 'function') startMarket(coin); // tính năng bổ sung trong market.js
   clearInterval(w.timer);
   loadSuggest(coin);
   connectStream();
@@ -111,6 +112,7 @@ function refreshWhale() {
   loadUnlock(coin);
   loadOnchain(coin);
   scoreBigTrades();
+  if (typeof refreshMarket === 'function') refreshMarket(coin);
 }
 
 // ---------- 0. Tổng hợp tín hiệu ----------

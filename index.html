@@ -10,7 +10,7 @@
   <meta name="theme-color" content="#f5f6f8" media="(prefers-color-scheme: light)">
   <meta name="theme-color" content="#181c22" media="(prefers-color-scheme: dark)">
   <title>Altcoin DCA Tracker</title>
-  <link rel="stylesheet" href="style.css?v=202611191500">
+  <link rel="stylesheet" href="style.css?v=202611211200">
 </head>
 <body>
   <header class="topbar">
@@ -57,6 +57,18 @@
         <h2>Long/Short của top trader <span class="muted small">(futures)</span></h2>
         <div id="wLs"></div>
       </div>
+    </section>
+
+    <section class="card">
+      <div class="row between wrap">
+        <h2>📈 CVD <span class="muted small">(mua chủ động − bán chủ động, cộng dồn theo thời gian)</span></h2>
+        <div class="chips" id="wCvdOpts">
+          <button data-frame="1d" class="active">24 giờ</button><button data-frame="7d">7 ngày</button><button data-frame="30d">30 ngày</button>
+          <span class="chipsep"></span>
+          <button data-market="spot" class="active">Spot</button><button data-market="futures">Futures</button>
+        </div>
+      </div>
+      <div id="wCvd"></div>
     </section>
 
     <section class="grid2">
@@ -280,9 +292,10 @@
   </main>
 
   <footer class="muted small">Dữ liệu chỉ lưu trên trình duyệt này. Nhớ bấm “Xuất” để sao lưu. Giá lấy từ Binance.</footer>
-  <script src="app.js?v=202611191500"></script>
-  <script src="whale.js?v=202611191500"></script>
-  <script src="gold.js?v=202611191500"></script>
-  <script src="pivot.js?v=202611191500"></script>
+  <script src="app.js?v=202611211200"></script>
+  <script src="whale.js?v=202611211200"></script>
+  <script src="gold.js?v=202611211200"></script>
+  <script src="pivot.js?v=202611211200"></script>
+  <script src="market.js?v=202611211200"></script>
 </body>
 </html>
