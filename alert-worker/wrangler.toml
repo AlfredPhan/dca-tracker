@@ -23,3 +23,7 @@ crons = ["* * * * *"] # chạy mỗi phút
 COINS ="BTC:500000,ETH:500000,ARB:10000,APT:10000,FET:10000,OP:10000,TIA:10000,LDO:10000,BICO:10000"
 # Quét thêm sàn phụ cho coin giao dịch mạnh ở sàn khác (bybit, coinbase, okx). Ngưỡng lấy theo COINS.
 EXTRA = "TIA:bybit,FET:coinbase"
+# Báo khi giá chạm mức Pivot. Khung: d=ngày, w=tuần, m=tháng, y=năm (bỏ "d" nếu thấy báo quá nhiều).
+PIVOT_FRAMES = "d,w,m,y"
+PIVOT_LEVELS = "R3,R2,R1,P,S1,S2,S3"
+PIVOT_GOLD = "1" # 1 = báo cả vàng (XAUUSDT), 0 = tắt

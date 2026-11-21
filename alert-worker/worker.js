@@ -5,6 +5,7 @@
 
 import { DurableObject } from 'cloudflare:workers';
 import { recordDay, periodsEndingAt, periodSummary, cleanup } from './summary.js';
+import { pivotCheck } from './pivot.js';
 
 // Binance chặn một số vùng của Cloudflare, nên thử lần lượt các host.
 const BINANCE_HOSTS = ['https://api-gcp.binance.com', 'https://api.binance.com', 'https://data-api.binance.vision'];
@@ -193,13 +194,31 @@ async function check(env, scheduledTime, storage) {
 
   try { await recordDay(storage, start, tally); } catch (e) { console.log('recordDay error:', e.message); }
 
+  // Báo giá chạm mức Pivot. Lúc 7:00 (đóng nến) không cập nhật mức để dành request cho bản tổng kết; phút sau mới cập nhật.
+  try {
+    const sod = end % 86400e3 === 0;
+    const msg = await pivotCheck({
+      storage, getJson, host, end, site: SITE.replace('#whale', '#pivot'),
+      coins: [...coins.map((c) => c.coin), ...(env.PIVOT_GOLD === '0' ? [] : ['XAU'])],
+      frames: (env.PIVOT_FRAMES || 'd,w,m,y').toLowerCase().split(',').map((s) => s.trim()).filter(Boolean),
+      names: (env.PIVOT_LEVELS || 'R3,R2,R1,P,S1,S2,S3').toUpperCase().split(',').map((s) => s.trim()).filter(Boolean),
+      refreshLimit: sod ? 0 : 4,
+    });
+    if (msg) await sendTelegram(env, msg);
+  } catch (e) { console.log('pivot error:', e.message); }
+
   // 7:00 sáng giờ VN: nến Binance đóng. Tổng kết nến ngày (mỗi ngày), tuần (thứ Hai), tháng (ngày 1), năm (1/1).
+  // % giá trong nến: lấy nến ngày 1 lần cho mỗi coin (đủ cho kỳ dài nhất), rồi tính giá mở/đóng của từng kỳ.
+  const periods = periodsEndingAt(end);
+  const dailyK = {};
   const priceChange = async (coin, p) => {
     if (!host) return null;
-    const k = await getJson(`${host}/api/v3/klines?symbol=${coin}USDT&interval=${p.interval}&startTime=${p.from}&endTime=${p.to - 1}&limit=${p.limit}`);
+    const from = Math.min(...periods.map((x) => x.from));
+    dailyK[coin] ||= getJson(`${host}/api/v3/klines?symbol=${coin}USDT&interval=1d&startTime=${from}&endTime=${end - 1}&limit=1000`);
+    const k = (await dailyK[coin]).filter((c) => c[0] >= p.from && c[0] < p.to);
     return k.length ? (+k[k.length - 1][4] / +k[0][1] - 1) * 100 : null;
   };
-  for (const p of periodsEndingAt(end)) {
+  for (const p of periods) {
     try {
       await sendTelegram(env, (await periodSummary(storage, coins, p, priceChange)) + ` · <a href="${SITE}">web</a>`);
     } catch (e) {
