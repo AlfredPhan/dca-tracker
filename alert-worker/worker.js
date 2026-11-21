@@ -193,7 +193,7 @@ async function check(env, scheduledTime, storage) {
 
   try { await recordDay(storage, start, tally); } catch (e) { console.log('recordDay error:', e.message); }
 
-  // 7:00 sáng giờ VN: tổng kết gom/xả của ngày hôm qua (0h–24h).
+  // 7:00 sáng giờ VN: nến ngày Binance đóng, tổng kết gom/xả của nến vừa đóng (7:00 hôm qua → 7:00 hôm nay).
   const d0 = new Date(end);
   if (d0.getUTCHours() === 0 && d0.getUTCMinutes() === 0) {
     try {

@@ -1,11 +1,11 @@
-// Tổng kết lệnh lớn theo ngày (giờ Việt Nam), gửi lúc 7:00 sáng hôm sau.
-// Mỗi phút bot cộng dồn lệnh lớn đã quét vào bộ nhớ của Durable Object (key "day:YYYY-MM-DD").
+// Tổng kết lệnh lớn theo nến ngày Binance: từ 7:00 sáng hôm qua đến 7:00 sáng hôm nay (giờ VN), gửi lúc 7:00.
+// Mỗi phút bot cộng dồn lệnh lớn đã quét vào bộ nhớ của Durable Object (key "day:YYYY-MM-DD" = ngày của nến).
 
 const VN = 7 * 3600e3;
 const DAY = 86400e3;
 
-// Ngày theo giờ Việt Nam, dạng YYYY-MM-DD.
-export const vnDate = (ms) => new Date(ms + VN).toISOString().slice(0, 10);
+// Ngày của nến ngày Binance (nến mở lúc 7:00 VN = 00:00 UTC), dạng YYYY-MM-DD.
+export const vnDate = (ms) => new Date(ms).toISOString().slice(0, 10);
 
 const usd = (n) => n >= 1e6 ? `$${(n / 1e6).toFixed(2)}M` : n >= 1000 ? `$${(n / 1000).toFixed(1)}K` : `$${Math.round(n)}`;
 const hhmm = (ms) => new Date(ms + VN).toISOString().slice(11, 16);
@@ -22,11 +22,11 @@ export async function recordDay(storage, start, tally) {
   await storage.put(key, d);
 }
 
-// end = thời điểm chạy lúc 7:00 VN (00:00 UTC). Tổng kết ngày VN vừa qua (0h–24h).
-// priceChange(coin, start, end) trả về % thay đổi giá trong ngày hoặc null.
+// end = thời điểm chạy lúc 7:00 VN (00:00 UTC), cũng là lúc nến ngày đóng. Tổng kết nến vừa đóng.
+// priceChange(coin, start, end) trả về % thay đổi giá trong nến hoặc null.
 export async function dailySummary(storage, coins, end, priceChange) {
-  const dayEnd = end - VN;            // 0h hôm nay giờ VN
-  const dayStart = dayEnd - DAY;      // 0h hôm qua giờ VN
+  const dayEnd = end;                 // 7:00 hôm nay giờ VN
+  const dayStart = dayEnd - DAY;      // 7:00 hôm qua giờ VN
   const key = 'day:' + vnDate(dayStart);
   const d = await storage.get(key);
 
@@ -73,7 +73,8 @@ export function buildSummary(d, coins, dayStart, changes) {
   else if (d.first > dayStart + 10 * 60e3) warn = `\n⚠️ Bot mới bắt đầu ghi từ ${hhmm(d.first)}, chưa đủ cả ngày.`;
   else if (missing > 30) warn = `\n⚠️ Thiếu khoảng ${missing} phút dữ liệu.`;
 
-  return `📊 <b>Tổng kết lệnh lớn ngày ${day}/${m}</b>\n\n${lines.join('\n')}\n\n` +
+  const [, m2, day2] = vnDate(dayStart + DAY).split('-');
+  return `📊 <b>Tổng kết lệnh lớn ngày ${day}/${m}</b>\n<i>Nến ngày: 7h ${day}/${m} → 7h ${day2}/${m2} giờ VN</i>\n\n${lines.join('\n')}\n\n` +
     `${totals ? `Tổng: ${totals}` : ''}${warn}\n` +
-    `<i>Gom/xả = tổng lệnh lớn mua/bán chủ động trong ngày (0h–24h giờ VN). Lệnh lớn: ${rule}.</i>`;
+    `<i>Gom/xả = tổng lệnh lớn mua/bán chủ động trong nến ngày. Lệnh lớn: ${rule}.</i>`;
 }
