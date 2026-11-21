@@ -8,6 +8,7 @@ const mk = { coin: null, cvdFrame: '1d', cvdMarket: 'spot' };
 function startMarket(coin) {
   mk.coin = coin;
   $('#wCvd').innerHTML = '<span class="muted small">Đang tải…</span>';
+  startLiq(coin);
 }
 
 function refreshMarket(coin) {
@@ -130,6 +131,100 @@ function renderCvd(pts, vol, f, market) {
   svg.addEventListener('pointermove', (e) => show(e.clientX));
   svg.addEventListener('pointerdown', (e) => show(e.clientX));
   svg.addEventListener('pointerleave', hide);
+}
+
+// ---------- Thanh lý (liquidation) realtime ----------
+// Luồng !forceOrder@arr của Binance Futures: lệnh bị sàn đóng cưỡng bức vì hết ký quỹ.
+// S = SELL nghĩa là sàn bán ra để đóng vị thế LONG (Long bị thanh lý); S = BUY là Short bị thanh lý.
+// Lưu ý: Binance chỉ gửi tối đa 1 lệnh thanh lý mỗi giây cho mỗi cặp, nên con số là mẫu, thường thấp hơn thực tế.
+const LIQ_WS = 'wss://fstream.binance.com/market/ws/!forceOrder@arr';
+const LIQ_FEED_MAX = 60;
+const LIQ_MARKET_MIN = 50000; // danh sách toàn thị trường chỉ hiện lệnh từ 50K USD
+const liq = {
+  ws: null, since: null, coin: null,
+  coinSum: { long: 0, short: 0, nLong: 0, nShort: 0 }, all: { long: 0, short: 0, nLong: 0, nShort: 0 },
+  coinFeed: [], allFeed: [], timer: null,
+};
+
+function startLiq(coin) {
+  liq.coin = coin;
+  liq.coinSum = { long: 0, short: 0, nLong: 0, nShort: 0 };
+  liq.coinFeed = [];
+  liq.coinSince = Date.now();
+  if (!liq.ws) connectLiq();
+  renderLiq();
+}
+
+function connectLiq() {
+  const ws = new WebSocket(LIQ_WS);
+  liq.ws = ws;
+  liq.since ||= Date.now();
+  ws.onopen = () => renderLiq();
+  ws.onmessage = (e) => {
+    const o = JSON.parse(e.data).o;
+    if (!o || !o.s.endsWith('USDT')) return;
+    const value = +o.ap * +o.z, isLong = o.S === 'SELL', coin = o.s.slice(0, -4);
+    const item = { coin, value, isLong, price: +o.ap, time: o.T };
+    const add = (sum) => { if (isLong) { sum.long += value; sum.nLong++; } else { sum.short += value; sum.nShort++; } };
+    add(liq.all);
+    if (value >= LIQ_MARKET_MIN) { liq.allFeed.unshift(item); liq.allFeed.length = Math.min(liq.allFeed.length, LIQ_FEED_MAX); }
+    if (coin === liq.coin) { add(liq.coinSum); liq.coinFeed.unshift(item); liq.coinFeed.length = Math.min(liq.coinFeed.length, LIQ_FEED_MAX); }
+    // Gộp các lần vẽ lại (thanh lý hàng loạt có thể tới nhiều tin mỗi giây).
+    liq.timer ||= setTimeout(() => { liq.timer = null; renderLiq(); }, 500);
+  };
+  ws.onclose = () => {
+    if (liq.ws !== ws) return;
+    liq.ws = null;
+    renderLiq('Mất kết nối, đang thử lại…');
+    setTimeout(() => { if (!liq.ws) connectLiq(); }, 3000);
+  };
+}
+
+function liqRow(label, s) {
+  const total = s.long + s.short, pct = total ? s.long / total * 100 : 50;
+  return `<div class="flow liqflow"><span>${label}</span>
+    <div class="bar liqbar${total ? '' : ' empty'}" title="Long ${pct.toFixed(0)}% / Short ${(100 - pct).toFixed(0)}%"><span style="width:${pct}%"></span></div>
+    <span class="verdict small"><b class="down">${fmtUsdShort(s.long)}</b> / <b class="up">${fmtUsdShort(s.short)}</b></span></div>`;
+}
+
+function liqVerdict(s, name) {
+  const total = s.long + s.short;
+  if (total < 1000) return `Chưa có thanh lý đáng kể của ${name}.`;
+  const pct = s.long / total * 100;
+  if (pct >= 65) return `💥 Phe <b class="down">LONG bị quét</b> là chính (${pct.toFixed(0)}%): giá đang bị đạp xuống, người dùng đòn bẩy mua lên bị cháy tài khoản. Sau đợt quét lớn, giá hay hồi lại vì lực bán cưỡng bức đã hết.`;
+  if (pct <= 35) return `💥 Phe <b class="up">SHORT bị quét</b> là chính (${(100 - pct).toFixed(0)}%): giá bị đẩy lên, người bán khống bị buộc mua lại (short squeeze), giá có thể tăng vọt ngắn hạn.`;
+  return 'Long và Short bị thanh lý khá cân bằng: giá giật hai chiều.';
+}
+
+function liqFeed(list, showCoin) {
+  if (!list.length) return '<p class="muted small">Chưa có lệnh nào.</p>';
+  return `<table class="liqtable"><tbody>${list.map((x) => `<tr>
+    <td>${new Date(x.time).toLocaleTimeString('vi-VN')}</td>
+    ${showCoin ? `<td><b>${esc(x.coin)}</b></td>` : ''}
+    <td class="${x.isLong ? 'down' : 'up'}">${x.isLong ? 'Long cháy' : 'Short cháy'}</td>
+    <td>${fmtPrice(x.price)}</td>
+    <td class="${x.isLong ? 'down' : 'up'}"><b>${fmtUsdShort(x.value)}</b></td></tr>`).join('')}</tbody></table>`;
+}
+
+function renderLiq(status) {
+  const el = $('#wLiq');
+  if (!el || !liq.coin) return;
+  const t = (ms) => new Date(ms).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' });
+  $('#wLiqLive').innerHTML = status ? `<span class="down">● ${status}</span>`
+    : liq.ws?.readyState === 1 ? '<span class="up">● Live</span>' : 'Đang kết nối…';
+  const c = liq.coinSum;
+  el.innerHTML = `
+    ${liqRow(esc(liq.coin), c)}
+    ${liqRow('Toàn thị trường', liq.all)}
+    <p class="hint"><b class="down">Đỏ = Long bị thanh lý</b> · <b class="up">Xanh = Short bị thanh lý</b>.
+      ${esc(liq.coin)} từ ${t(liq.coinSince)} (${c.nLong + c.nShort} lệnh), toàn thị trường từ ${t(liq.since)} (${liq.all.nLong + liq.all.nShort} lệnh).</p>
+    <p class="verdictline">${liqVerdict(c.long + c.short >= 1000 ? c : liq.all, c.long + c.short >= 1000 ? esc(liq.coin) : 'toàn thị trường')}</p>
+    <div class="grid2 liqgrid">
+      <div><h3 class="small">${esc(liq.coin)}</h3><div class="tablewrap feed">${liqFeed(liq.coinFeed, false)}</div></div>
+      <div><h3 class="small">Toàn thị trường <span class="muted">(từ ${fmtUsdShort(LIQ_MARKET_MIN)})</span></h3><div class="tablewrap feed">${liqFeed(liq.allFeed, true)}</div></div>
+    </div>
+    <p class="hint">Chỉ tính từ lúc mở trang. Binance chỉ gửi tối đa 1 lệnh thanh lý mỗi giây cho mỗi cặp, nên con số thực tế thường lớn hơn.
+      Coin không có futures trên Binance sẽ không có thanh lý.</p>`;
 }
 
 // Nếu tab Cá voi đã khởi động trước khi file này tải xong (VD: mở link #whale=BTC), bắt kịp ngay.
