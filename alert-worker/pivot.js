@@ -94,7 +94,7 @@ export async function pivotCheck({ storage, getJson, host, coins, end, frames, n
   if (!host) return '';
   const today = new Date(end).toISOString().slice(0, 10);
   const lv = (await storage.get('pivot:levels')) || {};
-  const st = (await storage.get('pivot:state')) || { last: {}, sent: {} };
+  const st = (await storage.get('pivot:state2')) || { last: {}, sent: {} };
 
   // 1) Cập nhật mức khi sang ngày mới (tối đa refreshLimit coin mỗi phút để không vượt giới hạn request).
   const stale = coins.filter((c) => lv[c]?.day !== today);
@@ -108,7 +108,10 @@ export async function pivotCheck({ storage, getJson, host, coins, end, frames, n
   const spot = coins.filter((c) => c !== 'XAU');
   if (spot.length) try {
     const list = await getJson(`${host}/api/v3/ticker?windowSize=1m&type=MINI&symbols=${encodeURIComponent(JSON.stringify(spot.map((c) => c + 'USDT')))}`);
-    for (const t of list) ranges[t.symbol.slice(0, -4)] = { low: +t.lowPrice, high: +t.highPrice, last: +t.lastPrice };
+    // Phút không có lệnh khớp nào thì Binance trả giá = 0: bỏ qua coin đó (coi như giá đứng yên).
+    for (const t of list) {
+      if (+t.lowPrice > 0 && +t.highPrice > 0 && +t.lastPrice > 0) ranges[t.symbol.slice(0, -4)] = { low: +t.lowPrice, high: +t.highPrice, last: +t.lastPrice };
+    }
   } catch (e) { console.log('pivot ticker', e.message); }
   const wd = new Date(end).getUTCDay();
   if (coins.includes('XAU') && wd >= 1 && wd <= 5) { // vàng nghỉ cuối tuần
@@ -121,8 +124,10 @@ export async function pivotCheck({ storage, getJson, host, coins, end, frames, n
   // 3) So với giá phút trước để tìm mức bị chạm.
   const lines = [];
   for (const c of coins) {
-    const r = ranges[c], prev = st.last[c];
-    if (!r) continue;
+    const r = ranges[c], prev = st.last[c] > 0 ? st.last[c] : null;
+    if (!r || !(r.low > 0 && r.last > 0)) continue;
+    // Chặn dữ liệu bất thường: giá trong 1 phút lệch quá 15% so với phút trước thì bỏ qua lần này.
+    if (prev && (r.low < prev * 0.85 || r.high > prev * 1.15)) { console.log('pivot bỏ qua dữ liệu lạ', c, prev, r.low, r.high); st.last[c] = r.last; continue; }
     st.last[c] = r.last;
     if (prev == null || lv[c]?.day !== today) continue;
     for (const h of touches(lv[c].levels, prev, r.low, r.high, frames, names)) {
@@ -137,7 +142,7 @@ export async function pivotCheck({ storage, getJson, host, coins, end, frames, n
     }
   }
   for (const [k, t] of Object.entries(st.sent)) if (end - t > 2 * DAY) delete st.sent[k];
-  await storage.put('pivot:state', st);
+  await storage.put('pivot:state2', st);
 
   if (!lines.length) return '';
   lines.sort((a, b) => a.order - b.order);
