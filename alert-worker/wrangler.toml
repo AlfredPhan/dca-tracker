@@ -30,5 +30,6 @@ PIVOT_LEVELS = "R3,R2,R1,P,S1,S2,S3"
 PIVOT_GOLD = "1" # 1 = báo cả vàng (XAUUSDT), 0 = tắt
 NEWS_REMIND = "1" # 1 = nhắc trước 30 phút khi có tin Mỹ mạnh (CPI, việc làm, Fed...), 0 = tắt
 # Theo dõi kịch bản sóng Elliott BTC: "W0,W1,W2,W3" = đỉnh đầu sóng C, đáy sóng 1, đỉnh sóng 2, đáy sóng 3 (giá Binance).
-# Đổi số là bot theo dõi lại từ đầu. Đặt "0" để tắt.
-ELLIOTT_BTC = "87395.67,75736.38,81196.01,55130"
+# Số thứ 5 (tùy chọn) = đỉnh sóng 4 nhỏ của cách đếm phụ "sóng C đã xong ở W3": vượt mức này bot báo sớm.
+# Đổi 4 số đầu là bot theo dõi lại từ đầu. Đặt "0" để tắt.
+ELLIOTT_BTC = "87395.67,75736.38,81196.01,55130,66132"

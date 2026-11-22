@@ -1,5 +1,5 @@
 // Theo dõi kịch bản sóng Elliott của BTC (sóng C của đợt điều chỉnh từ đỉnh 126K) và báo Telegram.
-// Điểm sóng đặt trong wrangler.toml: ELLIOTT_BTC = "W0,W1,W2,W3" (giá Binance BTCUSDT):
+// Điểm sóng đặt trong wrangler.toml: ELLIOTT_BTC = "W0,W1,W2,W3[,ALT]" (giá Binance BTCUSDT):
 //   W0 = đầu sóng C (đỉnh), W1 = đáy sóng 1, W2 = đỉnh sóng 2, W3 = đáy sóng 3.
 // Đổi điểm sóng thì bot tự bắt đầu theo dõi lại từ đầu. Mọi mức Fib tính theo thang log (giống TradingView bật "log scale").
 //
@@ -23,12 +23,20 @@ const HEAD = '🌊 <b>Elliott BTC</b>';
 const fmt = (p) => '$' + Math.round(p).toLocaleString('en-US');
 const pct = (a, b) => `${a >= b ? '+' : ''}${((a / b - 1) * 100).toFixed(1)}%`;
 
+// Số thứ 5 (không bắt buộc) = đỉnh sóng 4 nhỏ của cách đếm phụ "sóng C đã đủ 5 sóng con, kết thúc ở W3".
+// Giá vượt mức này là dấu hiệu sớm cho cách đếm phụ.
 export function parseWaves(s) {
   const v = String(s || '').split(',').map(Number);
-  if (v.length !== 4 || !v.every((x) => x > 0)) return null;
-  const [w0, w1, w2, w3] = v;
-  return w0 > w2 && w2 > w1 && w1 > w3 ? { w0, w1, w2, w3 } : null;
+  if ((v.length !== 4 && v.length !== 5) || !v.every((x) => x > 0)) return null;
+  const [w0, w1, w2, w3, alt] = v;
+  if (!(w0 > w2 && w2 > w1 && w1 > w3)) return null;
+  return { w0, w1, w2, w3, alt: alt > w3 && alt < w1 ? alt : null, sig: v.slice(0, 4).join(',') };
 }
+
+// Mốc đóng nến khung lớn (xấp xỉ các đường trung bình trên chart TradingView của bạn, sửa ở đây khi chúng dịch chuyển).
+const WEEK_BULL = 72000;     // nến tuần đóng trên: lấy lại các đường trung bình tuần, tín hiệu đảo chiều tăng
+const MONTH_LEVEL = 53400;   // đường trung bình khung tháng (đường trắng) từng đỡ đáy 2018 và 2022
+const QUARTER_LEVEL = 61400; // đường trung bình khung quý (đường cam)
 
 // top = đỉnh sóng 4 (chưa có thì giả sử hồi tới Fib 0.382 như hình bạn vẽ).
 export function levels(cfg, w3, top) {
@@ -98,7 +106,8 @@ function initMessage(cfg, st) {
     `Sóng (0) ${fmt(cfg.w0)} → (1) ${fmt(cfg.w1)} → (2) ${fmt(cfg.w2)} → (3) ${fmt(st.w3)}\n` +
     `Đang ở <b>sóng 4 (hồi)</b>, đỉnh hồi cao nhất ${fmt(st.hi)}. RSI ngày ở đáy sóng 3: ${st.rsi3.toFixed(1)}\n\n` +
     `Vùng hồi sóng 4 (Fib thoái lui): ${r}\n${targetsText(lv)}\n` +
-    `Sai cách đếm hướng lên nếu vượt ${fmt(cfg.w1)} (đáy sóng 1).\n\n` +
+    `Sai cách đếm hướng lên nếu vượt ${fmt(cfg.w1)} (đáy sóng 1).\n` +
+    (cfg.alt ? `Cách đếm phụ (sóng C đã xong ở ${fmt(st.w3)}): dấu hiệu sớm khi vượt ${fmt(cfg.alt)}.\n` : '') + '\n' +
     `<i>Bot báo khi: chạm từng mức Fib · sóng 4 có thể đã xong (rơi 5% từ đỉnh hồi) · chạm mục tiêu sóng 5 · thủng/giữ đáy sóng 3 · phân kỳ RSI · cách đếm sai. Tóm tắt lúc 7:01 mỗi sáng.</i>`;
 }
 
@@ -128,6 +137,9 @@ export function step(st, cfg, { low, high, last }) {
       }
     }
     st.hi = Math.max(st.hi, high);
+    if (cfg.alt && st.hi > cfg.alt) once('alt', `🟢 BTC vượt <b>${fmt(cfg.alt)}</b> (đỉnh sóng 4 nhỏ của cách đếm phụ): <b>dấu hiệu sớm sóng C đã kết thúc ở ${fmt(st.w3)}</b>.\n` +
+      `Cách đếm phụ: đoạn rơi về ${fmt(st.w3)} đã đủ 5 sóng con, đáy đúng Fib 0.618 của sóng A, có phân kỳ RSI 4 giờ.\n` +
+      `Chưa chắc chắn: vẫn có thể là sóng 4 hồi sâu. Xác nhận mạnh hơn khi vượt ${fmt(lv.retr[3].p)}, chắc chắn khi vượt ${fmt(cfg.w1)}. Giữ trên ${fmt(st.w3)} là điều kiện bắt buộc.`);
     for (const { L, p } of lv.retr) {
       if (st.hi >= p) once('r' + L, `↗️ Sóng 4: BTC hồi chạm <b>Fib ${L}</b> ≈ ${fmt(p)} (cao nhất ${fmt(st.hi)}, ${pct(st.hi, st.w3)} từ đáy sóng 3).\n` +
         (L === 0.382 ? 'Đây là vùng sóng 4 hay dừng nhất. Chú ý nến đảo chiều giảm.' : L === 0.618 ? `Hồi sâu bất thường. Vượt ${fmt(cfg.w1)} là cách đếm sai.` :
@@ -157,7 +169,8 @@ export function step(st, cfg, { low, high, last }) {
       : `Chờ RSI ngày tạo đáy cao hơn ${st.rsi3.toFixed(1)} để xác nhận đáy.`));
     if (st.lo <= st.w3 * 1.005) once('re3', `⚠️ BTC thử lại đáy sóng 3 (${fmt(st.w3)}). Giữ được là kịch bản 1, thủng là kịch bản 2.`);
     if (st.lo < st.w3) once('brk3', `📉 BTC <b>thủng đáy sóng 3</b> ${fmt(st.w3)}: sóng 5 đang chạy, nghiêng về <b>kịch bản 2</b>.\n` +
-      `Các tầng kế tiếp: 0.382 ${fmt(e[0.382])} · 0.5 ${fmt(e[0.5])} · 0.618 <b>${fmt(e[0.618])}</b>`);
+      `Các tầng kế tiếp: 0.382 ${fmt(e[0.382])} · 0.5 ${fmt(e[0.5])} · 0.618 <b>${fmt(e[0.618])}</b>` +
+      (cfg.alt ? `\nCách đếm phụ (sóng C xong ở ${fmt(st.w3)}) bị loại.` : ''));
     for (const L of [0.382, 0.5, 0.618]) {
       if (e[L] < st.w3 && st.lo <= e[L]) once('e' + L, `🎯 BTC chạm <b>Fib ${L}</b> mở rộng ≈ ${fmt(e[L])}` +
         (L === 0.618 ? ' (mục tiêu chính của kịch bản 2, vùng mua mạnh nhất).' : '.') + ` Chờ RSI ngày tạo đáy cao hơn ${st.rsi3.toFixed(1)} để xác nhận đáy.`);
@@ -168,9 +181,11 @@ export function step(st, cfg, { low, high, last }) {
         `Mục tiêu xa hơn: sóng C bằng sóng A (thang log) khoảng 41–42K. Nên dừng mua và đánh giá lại. Bot ngừng theo dõi kịch bản này.`);
       return out;
     }
-    if (st.lo <= st.w3 * 1.03 && last >= st.lo * (1 + W5_BOUNCE)) {
+    // Đáy sóng 5: bật 8% từ đáy nằm dưới, hoặc cách đáy sóng 3 không quá 6% (sóng 5 cụt, không thủng đáy sóng 3).
+    if (st.lo <= st.w3 * 1.06 && last >= st.lo * (1 + W5_BOUNCE)) {
       st.phase = 'end'; st.w5 = st.lo;
-      out.push(`🟢 BTC bật ${pct(last, st.w5)} từ đáy ${fmt(st.w5)}: <b>có thể sóng 5 và cả sóng C đã kết thúc</b>.\n` +
+      out.push(`🟢 BTC bật ${pct(last, st.w5)} từ đáy ${fmt(st.w5)}: <b>có thể sóng 5 và cả sóng C đã kết thúc</b>` +
+        (st.w5 > st.w3 ? ` (sóng 5 cụt: không thủng đáy sóng 3 ${fmt(st.w3)}, hay gặp khi lực bán đã cạn).\n` : '.\n') +
         `Xác nhận khi vượt đỉnh sóng 4 ${fmt(st.w4)}. Thủng lại ${fmt(st.w5)} thì sóng 5 chưa xong.`);
     }
     return out;
@@ -193,6 +208,52 @@ const PHASE_VI = {
   w4: 'sóng 4 (hồi)', w5: 'sóng 5 (giảm cuối)', end: 'có thể đã hết sóng 5 (chờ xác nhận)',
 };
 
+// Đóng nến khung lớn: tuần (sáng thứ Hai, kèm phân kỳ RSI tuần), tháng (ngày 1), quý (1/1, 1/4, 1/7, 1/10).
+export function weeklyLines(w, w3) {
+  const lines = [];
+  const rsi = rsiSeries(w.map((c) => +c[4]));
+  const n = w.length - 1, c = +w[n][4];
+  lines.push(c < w3 ? `📉 <b>Nến tuần đóng dưới ${fmt(w3)}</b> (${fmt(c)}): mất đáy sóng 3, nghiêng về kịch bản 2.`
+    : `🕯 Nến tuần đóng ${fmt(c)}: giữ trên đáy ${fmt(w3)}.`);
+  if (c >= WEEK_BULL) lines.push(`🚀 Nến tuần đóng trên ${fmt(WEEK_BULL)}: lấy lại các đường trung bình tuần, tín hiệu đảo chiều tăng.`);
+  // Phân kỳ RSI tuần: đáy giá 3 tuần gần nhất so với đáy RSI trước đó (4 đến 40 tuần trước).
+  let iP = -1;
+  for (let i = Math.max(15, n - 40); i <= n - 4; i++) if (iP < 0 || rsi[i] < rsi[iP]) iP = i;
+  if (iP > 0) {
+    const pP = Math.min(...w.slice(iP - 2, iP + 3).map((x) => +x[3]));
+    const lowNow = Math.min(...w.slice(n - 2).map((x) => +x[3]));
+    const rNow = Math.min(...rsi.slice(n - 2));
+    if (lowNow < pP) {
+      lines.push(rNow > rsi[iP]
+        ? `🟢 <b>Phân kỳ tăng RSI tuần</b>: đáy giá ${fmt(lowNow)} thấp hơn ${fmt(pP)} nhưng RSI ${rNow.toFixed(1)} cao hơn ${rsi[iP].toFixed(1)}. Lực bán khung lớn đang yếu.`
+        : `⚪ Chưa có phân kỳ RSI tuần: giá thấp hơn đáy trước (${fmt(pP)}) và RSI cũng thấp hơn (${rNow.toFixed(1)} so với ${rsi[iP].toFixed(1)}).`);
+    }
+  }
+  return lines;
+}
+
+async function bigCloses(st, getJson, host, end) {
+  const lines = [];
+  const t = new Date(end);
+  if (t.getUTCDay() === 1) {
+    const w = await getJson(`${host}/api/v3/klines?symbol=BTCUSDT&interval=1w&endTime=${end - 61e3}&limit=300`);
+    lines.push(...weeklyLines(w, st.w3));
+  }
+  if (t.getUTCDate() === 1) {
+    const m = await getJson(`${host}/api/v3/klines?symbol=BTCUSDT&interval=1M&endTime=${end - 61e3}&limit=2`);
+    const c = +m[m.length - 1][4];
+    lines.push(c < MONTH_LEVEL
+      ? `📉 <b>Nến tháng đóng dưới ${fmt(MONTH_LEVEL)}</b> (${fmt(c)}): thủng đường trung bình khung tháng từng đỡ đáy 2018 và 2022. Rất xấu.`
+      : `🕯 Nến tháng đóng ${fmt(c)}: giữ trên đường trung bình khung tháng (~${fmt(MONTH_LEVEL)}).`);
+    if (t.getUTCMonth() % 3 === 0) {
+      lines.push(c < QUARTER_LEVEL
+        ? `📉 Nến quý đóng dưới đường trung bình khung quý (~${fmt(QUARTER_LEVEL)}): năm 2022 sau tình huống này giá rơi tiếp về đường xanh dương.`
+        : `🟢 Nến quý đóng trên đường trung bình khung quý (~${fmt(QUARTER_LEVEL)}): khung lớn giữ được.`);
+    }
+  }
+  return lines;
+}
+
 // Tóm tắt lúc 7:01 sáng (nến ngày vừa đóng): giá đóng cửa, RSI, phân kỳ, đóng nến dưới đáy sóng 3.
 async function daily(st, cfg, getJson, host, end) {
   const d = await getJson(`${host}/api/v3/klines?symbol=BTCUSDT&interval=1d&endTime=${end - 61e3}&limit=200`);
@@ -209,11 +270,13 @@ async function daily(st, cfg, getJson, host, end) {
       lines.push(`🟢 <b>Phân kỳ tăng RSI ngày</b>: giá thấp ${fmt(low)} (gần/dưới đáy sóng 3) nhưng RSI ${r.toFixed(1)} cao hơn đáy sóng 3 (${st.rsi3.toFixed(1)}). Lực bán đang yếu, dấu hiệu đáy.`);
     }
   }
+  try { lines.push(...await bigCloses(st, getJson, host, end)); } catch (e) { console.log('elliott closes', e.message); }
   const lv = levels(cfg, st.w3, st.phase === 'w4' ? null : st.w4);
   let where;
   if (st.phase === 'w4') {
     const next = lv.retr.find((x) => x.p > st.hi);
-    where = `Đỉnh hồi cao nhất ${fmt(st.hi)} (${pct(st.hi, st.w3)} từ đáy).${next ? ` Mức kế tiếp: Fib ${next.L} ${fmt(next.p)}.` : ''}`;
+    where = `Đỉnh hồi cao nhất ${fmt(st.hi)} (${pct(st.hi, st.w3)} từ đáy).${next ? ` Mức kế tiếp: Fib ${next.L} ${fmt(next.p)}.` : ''}` +
+      (cfg.alt && st.hi <= cfg.alt ? `\nCách đếm phụ (sóng C đã xong ở ${fmt(st.w3)}): dấu hiệu sớm khi vượt ${fmt(cfg.alt)}.` : '');
   } else if (st.phase === 'w5') where = `Đỉnh sóng 4 ${fmt(st.w4)} · thấp nhất từ đó ${fmt(st.lo)}.`;
   else where = `Đáy có thể của sóng 5: ${fmt(st.w5)} · xác nhận khi vượt ${fmt(st.w4)}.`;
   return `${HEAD} · tóm tắt sáng\nĐang ở: <b>${PHASE_VI[st.phase]}</b>\nĐóng nến ngày: ${fmt(close)} · RSI ngày ${r.toFixed(1)}\n${where}\n` +
@@ -225,9 +288,18 @@ export async function elliottCheck({ storage, getJson, host, end, cfgStr }) {
   if (!cfg || !host) return [];
   const out = [];
   let st = await storage.get(KEY);
-  if (!st || st.sig !== cfgStr) {
-    st = await init(cfg, cfgStr, getJson, host, end);
+  if (!st || st.sig !== cfg.sig) {
+    st = await init(cfg, cfg.sig, getJson, host, end);
+    st.v2 = 1;
     out.push(initMessage(cfg, st));
+  }
+  if (!st.v2) { // bot đang theo dõi từ trước: báo 1 lần các phần mới thêm
+    st.v2 = 1;
+    out.push(`${HEAD} · cập nhật\nBot báo thêm:\n` +
+      (cfg.alt ? `• Vượt ${fmt(cfg.alt)}: dấu hiệu sớm sóng C đã xong ở ${fmt(st.w3)} (cách đếm 5 sóng con)\n` : '') +
+      `• Sóng 5 cụt (bật 8% mà không thủng đáy sóng 3)\n` +
+      `• Sáng thứ Hai: đóng nến tuần so với ${fmt(st.w3)} và ${fmt(WEEK_BULL)}, phân kỳ RSI tuần\n` +
+      `• Ngày 1 hàng tháng: đóng nến tháng so với ~${fmt(MONTH_LEVEL)}; đầu quý: nến quý so với ~${fmt(QUARTER_LEVEL)}`);
   }
   if (!PHASE_VI[st.phase]) { await storage.put(KEY, st); return out; } // đã kết thúc kịch bản
 
