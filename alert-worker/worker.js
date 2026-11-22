@@ -8,6 +8,7 @@ import { recordDay, periodsEndingAt, periodSummary, cleanup } from './summary.js
 import { pivotCheck } from './pivot.js';
 import { calendarReminder, calendarToday } from './calendar.js';
 import { elliottCheck } from './elliott.js';
+import { planCheck } from './plan.js';
 
 // Binance chặn một số vùng của Cloudflare, nên thử lần lượt các host.
 const BINANCE_HOSTS = ['https://api-gcp.binance.com', 'https://api.binance.com', 'https://data-api.binance.vision'];
@@ -245,6 +246,13 @@ async function check(env, scheduledTime, storage) {
     try {
       for (const m of await elliottCheck({ storage, getJson, host, end, cfgStr: env.ELLIOTT_BTC })) await sendTelegram(env, m);
     } catch (e) { console.log('elliott error:', e.message); }
+  }
+
+  // Kế hoạch danh mục: vùng DCA/cắt lỗ cho coin giữ, vùng hồi để bán chuyển BTC cho coin yếu (chạy sau Elliott).
+  if (env.PLAN && env.PLAN !== '0') {
+    try {
+      for (const m of await planCheck({ storage, getJson, host, end, planStr: env.PLAN })) await sendTelegram(env, m);
+    } catch (e) { console.log('plan error:', e.message); }
   }
 
   // Nhắc trước 30 phút khi sắp có tin kinh tế mạnh của Mỹ (CPI, việc làm, Fed...).
