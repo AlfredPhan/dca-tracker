@@ -7,6 +7,7 @@ import { DurableObject } from 'cloudflare:workers';
 import { recordDay, periodsEndingAt, periodSummary, cleanup } from './summary.js';
 import { pivotCheck } from './pivot.js';
 import { calendarReminder, calendarToday } from './calendar.js';
+import { elliottCheck } from './elliott.js';
 
 // Binance chặn một số vùng của Cloudflare, nên thử lần lượt các host.
 const BINANCE_HOSTS = ['https://api-gcp.binance.com', 'https://api.binance.com', 'https://data-api.binance.vision'];
@@ -238,6 +239,13 @@ async function check(env, scheduledTime, storage) {
     });
     if (msg) await sendTelegram(env, msg);
   } catch (e) { console.log('pivot error:', e.message); }
+
+  // Theo dõi kịch bản sóng Elliott của BTC (điểm sóng trong ELLIOTT_BTC, để trống hoặc "0" để tắt).
+  if (env.ELLIOTT_BTC && env.ELLIOTT_BTC !== '0') {
+    try {
+      for (const m of await elliottCheck({ storage, getJson, host, end, cfgStr: env.ELLIOTT_BTC })) await sendTelegram(env, m);
+    } catch (e) { console.log('elliott error:', e.message); }
+  }
 
   // Nhắc trước 30 phút khi sắp có tin kinh tế mạnh của Mỹ (CPI, việc làm, Fed...).
   if (env.NEWS_REMIND !== '0') {
