@@ -10,7 +10,7 @@
   <meta name="theme-color" content="#f5f6f8" media="(prefers-color-scheme: light)">
   <meta name="theme-color" content="#181c22" media="(prefers-color-scheme: dark)">
   <title>Altcoin DCA Tracker</title>
-  <link rel="stylesheet" href="style.css?v=202611220100">
+  <link rel="stylesheet" href="style.css?v=202611230100">
 </head>
 <body>
   <header class="topbar">
@@ -20,9 +20,31 @@
       <button id="refreshBtn" class="ghost" title="Cập nhật giá">⟳</button>
       <button id="exportBtn" class="ghost">Xuất</button>
       <label class="ghost btnlike">Nhập<input id="importFile" type="file" accept=".json" hidden></label>
+      <button id="syncBtn" class="ghost" title="Đồng bộ giữa các thiết bị">☁️</button>
       <button id="themeBtn" class="ghost" title="Đổi giao diện">◐</button>
     </div>
   </header>
+
+  <dialog id="syncDlg" class="syncdlg">
+    <h2>☁️ Đồng bộ giữa các thiết bị</h2>
+    <div id="syncSetup">
+      <p class="hint">Lệnh mua/bán được lưu vào 1 <b>Gist bí mật</b> trên tài khoản GitHub của bạn. Nhập cùng một token trên laptop và điện thoại, hai máy sẽ tự cập nhật cho nhau, không cần Xuất/Nhập file nữa.</p>
+      <ol class="hint">
+        <li>Mở <a href="https://github.com/settings/tokens/new?scopes=gist&amp;description=DCA%20Tracker%20sync" target="_blank" rel="noopener">trang tạo token của GitHub</a> (đăng nhập nếu cần).</li>
+        <li>Chỉ tích ô <b>gist</b>, chọn thời hạn (Expiration), bấm <b>Generate token</b>.</li>
+        <li>Sao chép token (bắt đầu bằng <b>ghp_</b>) và dán vào ô dưới. Làm giống vậy trên máy thứ hai (dùng lại token cũ hoặc tạo token mới đều được).</li>
+      </ol>
+      <label>Token GitHub<input id="syncToken" type="password" placeholder="ghp_..." autocomplete="off" spellcheck="false"></label>
+      <button id="syncConnect" class="primary">Kết nối</button>
+    </div>
+    <div id="syncLinked" hidden>
+      <p id="syncInfo" class="hint"></p>
+      <p class="hint">Web tự đồng bộ khi bạn thêm, sửa, xóa lệnh, khi mở web và mỗi phút khi đang xem.</p>
+      <div class="row"><button id="syncNowBtn" class="primary">Đồng bộ ngay</button><button id="syncLogout">Ngắt trên máy này</button></div>
+    </div>
+    <p id="syncMsg" class="hint"></p>
+    <div class="row between"><span class="muted small">Token chỉ lưu trong trình duyệt của máy này.</span><button id="syncClose">Đóng</button></div>
+  </dialog>
 
   <nav class="tabs">
     <button class="tab active" data-tab="portfolio">💼 Danh mục</button>
@@ -333,10 +355,11 @@
   </main>
 
   <footer class="muted small">Dữ liệu chỉ lưu trên trình duyệt này. Nhớ bấm “Xuất” để sao lưu. Giá lấy từ Binance.</footer>
-  <script src="app.js?v=202611220100"></script>
-  <script src="whale.js?v=202611220100"></script>
-  <script src="gold.js?v=202611220100"></script>
-  <script src="pivot.js?v=202611220100"></script>
-  <script src="market.js?v=202611220100"></script>
+  <script src="app.js?v=202611230100"></script>
+  <script src="whale.js?v=202611230100"></script>
+  <script src="gold.js?v=202611230100"></script>
+  <script src="pivot.js?v=202611230100"></script>
+  <script src="market.js?v=202611230100"></script>
+  <script src="sync.js?v=202611230100"></script>
 </body>
 </html>

@@ -329,3 +329,11 @@ label.inline input { width: 110px; }
 .walltag.real { background: color-mix(in srgb, var(--accent) 22%, transparent); color: var(--text); }
 .walltag.new { border: 1px dashed var(--muted); }
 .histbars span.part i { opacity: .45; }
+.syncdlg { background: var(--card); color: var(--text); border: 1px solid var(--border); border-radius: 12px; padding: 16px; width: min(460px, calc(100vw - 32px)); }
+.syncdlg::backdrop { background: rgba(0, 0, 0, .55); }
+.syncdlg ol { padding-left: 18px; margin: 0 0 12px; }
+.syncdlg ol li { margin-bottom: 4px; }
+.syncdlg a { color: var(--accent); }
+.syncdlg .row { margin-top: 8px; flex-wrap: wrap; }
+#syncBtn.sync-on { border-color: var(--up); }
+#syncBtn.sync-err { border-color: var(--down); }
