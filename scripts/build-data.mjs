@@ -462,7 +462,7 @@ async function buildStatus() {
   const d = await loadBot();
   if (!d.status?.elliott && !d.status?.plan) throw new Error('bot chưa có trạng thái (cần deploy bản mới của bot)');
   console.log(`status: Elliott ${d.status.elliott?.phase || '—'}, kế hoạch ${d.status.plan?.length || 0} coin`);
-  return { updated: d.updated, elliott: d.status.elliott || null, plan: d.status.plan || null };
+  return { updated: d.updated, elliott: d.status.elliott || null, plan: d.status.plan || null, btcBuy: d.status.btcBuy || null };
 }
 
 // ---------- Chạy ----------

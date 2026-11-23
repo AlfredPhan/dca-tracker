@@ -9,6 +9,7 @@ import { pivotCheck } from './pivot.js';
 import { calendarReminder, calendarToday } from './calendar.js';
 import { elliottCheck, elliottStatus } from './elliott.js';
 import { planCheck, planStatus } from './plan.js';
+import { btcBuyCheck, btcBuyStatus } from './btcbuy.js';
 
 // Binance chặn một số vùng của Cloudflare, nên thử lần lượt các host.
 const BINANCE_HOSTS = ['https://api-gcp.binance.com', 'https://api.binance.com', 'https://data-api.binance.vision'];
@@ -30,6 +31,7 @@ export class Scanner extends DurableObject {
       const status = {};
       try { status.elliott = elliottStatus(this.env.ELLIOTT_BTC, await this.ctx.storage.get('elliott:btc')); } catch {}
       try { status.plan = planStatus(this.env.PLAN, await this.ctx.storage.get('plan:v1')); } catch {}
+      try { status.btcBuy = btcBuyStatus(this.env.BTC_BUY, await this.ctx.storage.get('btcbuy:v1')); } catch {}
       return Response.json({ updated: Date.now(), coins, days, status });
     }
     const { scheduledTime } = await request.json();
@@ -257,6 +259,13 @@ async function check(env, scheduledTime, storage) {
     try {
       for (const m of await planCheck({ storage, getJson, host, end, planStr: env.PLAN })) await sendTelegram(env, m);
     } catch (e) { console.log('plan error:', e.message); }
+  }
+
+  // Kế hoạch mua BTC từng phần bằng USDT bán altcoin (BTC_BUY, để trống hoặc "0" để tắt).
+  if (env.BTC_BUY && env.BTC_BUY !== '0') {
+    try {
+      for (const m of await btcBuyCheck({ storage, getJson, host, end, cfgStr: env.BTC_BUY })) await sendTelegram(env, m);
+    } catch (e) { console.log('btcbuy error:', e.message); }
   }
 
   // Nhắc trước 30 phút khi sắp có tin kinh tế mạnh của Mỹ (CPI, việc làm, Fed...).

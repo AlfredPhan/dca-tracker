@@ -204,10 +204,33 @@ function renderOvElliott(btc, focus) {
   const extra = e.phase === 'w4' ? `Đỉnh hồi cao nhất từ đáy: <b>${ovPx(e.hi)}</b> (${ovPct(ovDist(e.hi, e.w3))} từ đáy sóng 3).`
     : e.phase === 'w5' ? `Đỉnh sóng 4: <b>${ovPx(e.w4)}</b> · thấp nhất từ đó: <b>${ovPx(e.lo)}</b>.`
       : e.phase === 'end' ? `Đáy có thể của sóng 5: <b>${ovPx(e.w5)}</b>.` : '';
+  // Kế hoạch mua BTC từng phần (bằng USDT bán altcoin).
+  const bb = ov.status?.btcBuy;
+  let buy = '';
+  if (bb && btc) {
+    const n = bb.levels.length;
+    const nextI = bb.levels.findIndex((p) => p < btc);
+    const chips = bb.levels.map((p, i) => {
+      const inZone = btc <= p, d = ovDist(p, btc);
+      return `<span class="zchip ${inZone ? 'in' : bb.hit[i] ? 'hit' : i === nextI ? 'next' : ''}"><small>Phần ${i + 1}</small> <b>${ovPx(p)}</b>${inZone ? ' ✓' : ` <small>${ovPct(d)}</small>`}</span>`;
+    }).join('');
+    const cd = bb.chase ? ovDist(bb.chase, btc) : null;
+    buy = `<h3 class="ovgroup">🟠 Kế hoạch mua BTC từng phần</h3>
+      ${bb.done ? '<p class="verdictline">✅ Nến tuần đã đóng trên mức xác nhận: mua nốt phần còn lại.</p>' : `<div class="zchips">${chips}</div>`}
+      ${bb.chase && !bb.done ? `<p class="hint">Nến tuần đóng trên <b>${ovPx(bb.chase)}</b> (${ovPct(cd)}): mua nốt phần còn lại, không chờ vùng thấp. Bán altcoin xong thì giữ USDT, mua BTC chia ${n} phần theo các vùng này.</p>` : ''}`;
+    if (!bb.done) {
+      if (nextI > 0) focus.push({ pr: 1, icon: '🟠', text: `BTC đang ở vùng mua <b>phần ${nextI}</b> (${ovPx(bb.levels[nextI - 1])}): nếu chưa mua thì mua phần này.` });
+      else if (nextI === -1) focus.push({ pr: 1, icon: '🟠', text: `BTC dưới mọi vùng mua (thấp nhất ${ovPx(bb.levels[n - 1])}). Nếu còn rơi mạnh thì dừng và đánh giá lại.` });
+      else if (-ovDist(bb.levels[0], btc) <= 3) focus.push({ pr: 2, icon: '🟠', text: `BTC còn <b>${ovPct(ovDist(bb.levels[0], btc))}</b> tới vùng mua phần 1 (${ovPx(bb.levels[0])}).` });
+      if (cd != null && cd > 0 && cd <= 3) focus.push({ pr: 2, icon: '👀', text: `BTC còn <b>${ovPct(cd)}</b> tới ${ovPx(bb.chase)}. Vượt thì chờ nến tuần đóng trên mức này để mua nốt.` });
+      else if (cd != null && cd <= 0) focus.push({ pr: 1, icon: '👀', text: `BTC đang trên ${ovPx(bb.chase)}: nếu nến tuần (7:00 sáng thứ Hai) đóng trên mức này thì mua nốt phần BTC còn lại.` });
+    }
+  }
   el.innerHTML = head + `
     <div class="ewphase ${e.phase}"><b>${title}</b><div>${what}</div></div>
     <p class="verdictline">👉 ${todo}</p>
     ${extra ? `<p class="hint">${extra}</p>` : ''}
+    ${buy}
     ${rows ? `<div class="ewlist">${rows}</div>` : ''}
     <p class="muted small">Sóng (0) ${ovPx(e.w0)} → (1) ${ovPx(e.w1)} → (2) ${ovPx(e.w2)} → (3) ${ovPx(e.w3)}. Fib thang log.
       ${e.assumed ? 'Mục tiêu sóng 5 đang ước tính theo giả định sóng 4 hồi tới Fib 0.382, sẽ tính lại khi có đỉnh thật. ' : ''}
