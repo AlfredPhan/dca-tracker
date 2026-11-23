@@ -10,7 +10,7 @@
   <meta name="theme-color" content="#f5f6f8" media="(prefers-color-scheme: light)">
   <meta name="theme-color" content="#181c22" media="(prefers-color-scheme: dark)">
   <title>Altcoin DCA Tracker</title>
-  <link rel="stylesheet" href="style.css?v=202611230100">
+  <link rel="stylesheet" href="style.css?v=202611231200">
 </head>
 <body>
   <header class="topbar">
@@ -47,7 +47,8 @@
   </dialog>
 
   <nav class="tabs">
-    <button class="tab active" data-tab="portfolio">💼 Danh mục</button>
+    <button class="tab active" data-tab="overview">📋 Tổng quan</button>
+    <button class="tab" data-tab="portfolio">💼 Danh mục</button>
     <button class="tab" data-tab="whale">🐋 Cá voi</button>
     <button class="tab" data-tab="gold">🥇 Vàng</button>
     <button class="tab" data-tab="pivot">📐 Pivot</button>
@@ -275,7 +276,21 @@
     </details>
   </main>
 
-  <main id="tab-portfolio">
+  <main id="tab-overview">
+    <section class="card" id="ovFocus"></section>
+    <section class="summary" id="ovSummary"></section>
+    <section class="card" id="ovPlan"></section>
+    <section class="grid2">
+      <div class="card" id="ovElliott"></div>
+      <div class="ovcol">
+        <div class="card" id="ovMarket"></div>
+        <div class="card" id="ovUpcoming"></div>
+      </div>
+    </section>
+    <p class="muted small ovnote">Giá và lãi/lỗ cập nhật mỗi 30 giây từ Binance. Kịch bản Elliott và kế hoạch coin lấy từ bot Telegram mỗi giờ. Tham khảo, không phải lời khuyên đầu tư.</p>
+  </main>
+
+  <main id="tab-portfolio" hidden>
     <section class="summary" id="summary"></section>
 
     <section class="grid2">
@@ -355,11 +370,12 @@
   </main>
 
   <footer class="muted small">Dữ liệu chỉ lưu trên trình duyệt này. Nhớ bấm “Xuất” để sao lưu. Giá lấy từ Binance.</footer>
-  <script src="app.js?v=202611230100"></script>
-  <script src="whale.js?v=202611230100"></script>
-  <script src="gold.js?v=202611230100"></script>
-  <script src="pivot.js?v=202611230100"></script>
-  <script src="market.js?v=202611230100"></script>
-  <script src="sync.js?v=202611230100"></script>
+  <script src="app.js?v=202611231200"></script>
+  <script src="whale.js?v=202611231200"></script>
+  <script src="gold.js?v=202611231200"></script>
+  <script src="pivot.js?v=202611231200"></script>
+  <script src="market.js?v=202611231200"></script>
+  <script src="overview.js?v=202611231200"></script>
+  <script src="sync.js?v=202611231200"></script>
 </body>
 </html>

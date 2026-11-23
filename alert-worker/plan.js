@@ -149,3 +149,11 @@ export async function planCheck({ storage, getJson, host, end, planStr }) {
   await storage.put(KEY, st);
   return out;
 }
+
+// Kế hoạch + mức nào bot đã báo, cho trang Tổng quan trên web.
+export function planStatus(planStr, st) {
+  const plan = parsePlan(planStr);
+  if (!plan.length) return null;
+  const sent = st?.sig === planStr ? st.sent : {};
+  return plan.map((c) => ({ ...c, hit: c.levels.map((p) => !!sent[`${c.coin}:${c.mode}:${p}`]), stopHit: !!sent[`${c.coin}:stop`] }));
+}

@@ -337,3 +337,52 @@ label.inline input { width: 110px; }
 .syncdlg .row { margin-top: 8px; flex-wrap: wrap; }
 #syncBtn.sync-on { border-color: var(--up); }
 #syncBtn.sync-err { border-color: var(--down); }
+
+/* Tab Tổng quan */
+.tabs { overflow-x: auto; scrollbar-width: none; }
+.tabs .tab { white-space: nowrap; }
+.stat .sub { font-size: .78rem; color: var(--muted); margin-top: 2px; }
+.stat .sub b { color: var(--text); }
+#ovFocus { border-color: var(--accent); }
+#ovFocus.calm { border-color: var(--up); }
+.ovfocus { display: grid; gap: 6px; }
+.ovfocus > div { display: grid; grid-template-columns: 24px 1fr; gap: 6px; padding: 8px 10px; border-radius: 8px; font-size: .9rem;
+  background: color-mix(in srgb, var(--accent) 9%, transparent); }
+.ovcol { display: grid; gap: 16px; align-content: start; min-width: 0; }
+h3.ovgroup { font-size: .88rem; margin: 14px 0 6px; }
+.ovcoin { padding: 10px 0; border-top: 1px solid var(--border); cursor: pointer; }
+.ovcoin:hover { background: color-mix(in srgb, var(--accent) 5%, transparent); }
+.ovhead { display: flex; align-items: baseline; gap: 8px; margin-bottom: 6px; font-variant-numeric: tabular-nums; }
+.ovname { font-size: 1rem; min-width: 46px; }
+.ovpx { font-weight: 600; }
+.zchips { display: flex; flex-wrap: wrap; gap: 6px; }
+.zchip { display: inline-block; padding: 3px 9px; border-radius: 999px; border: 1px solid var(--border); font-size: .82rem;
+  font-variant-numeric: tabular-nums; white-space: nowrap; }
+.zchip small { color: var(--muted); }
+.zchip.next { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 14%, transparent); }
+.zchip.in { border-color: var(--up); background: color-mix(in srgb, var(--up) 16%, transparent); }
+.zchip.hit { border-style: dashed; }
+.ovfoot { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 4px 14px; margin-top: 6px; font-size: .82rem; font-variant-numeric: tabular-nums; }
+.ovstop small { margin-left: 2px; }
+.ovbtc { font-size: 1.2rem; font-variant-numeric: tabular-nums; }
+.ewphase { padding: 10px 12px; border-radius: 10px; font-size: .88rem; background: color-mix(in srgb, var(--accent) 10%, transparent); }
+.ewphase b { font-size: 1.02rem; display: block; margin-bottom: 2px; }
+.ewphase.w5, .ewphase.down { background: color-mix(in srgb, var(--down) 10%, transparent); }
+.ewphase.end, .ewphase.up, .ewphase.done { background: color-mix(in srgb, var(--up) 12%, transparent); }
+.ewlist { margin: 10px 0 8px; font-size: .84rem; font-variant-numeric: tabular-nums; }
+.ewrow { display: grid; grid-template-columns: 74px 1fr 58px; gap: 8px; padding: 5px 6px; border-top: 1px solid var(--border); align-items: baseline; }
+.ewrow > :last-child { text-align: right; }
+.ewrow > :first-child { font-weight: 600; }
+.ewrow.inv > :first-child { color: var(--down); }
+.ewrow.tgt > :first-child { color: var(--up); }
+.ewrow.alt > :first-child, .ewrow.base > :first-child { color: var(--accent); }
+.ewrow.hit { opacity: .6; }
+.ewrow.now { background: color-mix(in srgb, var(--accent) 18%, transparent); border-radius: 6px; font-weight: 650; }
+.ovkv { display: grid; grid-template-columns: 22px auto 1fr; gap: 8px 10px; align-items: baseline; font-size: .86rem; font-variant-numeric: tabular-nums; }
+#ovUpcoming .ovkv { grid-template-columns: 22px 1fr auto; }
+.ovflows { display: inline-flex; flex-wrap: wrap; gap: 4px 10px; }
+button.small { padding: 3px 10px; font-size: .8rem; }
+@media (max-width: 640px) {
+  #ovMarket .ovkv { grid-template-columns: 22px 1fr; }
+  #ovMarket .ovkv > :nth-child(3n) { grid-column: 2; margin-top: -6px; }
+}

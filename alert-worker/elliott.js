@@ -320,3 +320,17 @@ export async function elliottCheck({ storage, getJson, host, end, cfgStr }) {
   await storage.put(KEY, st);
   return out;
 }
+
+// Trạng thái hiện tại cho trang Tổng quan trên web (chỉ đọc, không chứa dữ liệu cá nhân).
+export function elliottStatus(cfgStr, st) {
+  const cfg = parseWaves(cfgStr);
+  if (!cfg || !st) return null;
+  const lv = levels(cfg, st.w3, st.phase === 'w4' ? null : st.w4);
+  return {
+    phase: st.phase, w0: cfg.w0, w1: cfg.w1, w2: cfg.w2, w3: st.w3, alt: cfg.alt,
+    hi: st.hi, w4: st.w4 ?? null, lo: st.lo ?? null, w5: st.w5 ?? null, rsi3: st.rsi3, last: st.last ?? null,
+    retr: lv.retr.map(({ L, p }) => ({ L, p, hit: !!st.sent['r' + L] || st.hi >= p })),
+    top: lv.top, assumed: lv.assumed, t1: lv.t1, ext: lv.ext,
+    hits: Object.keys(st.sent || {}),
+  };
+}

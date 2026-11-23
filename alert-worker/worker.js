@@ -7,8 +7,8 @@ import { DurableObject } from 'cloudflare:workers';
 import { recordDay, periodsEndingAt, periodSummary, cleanup } from './summary.js';
 import { pivotCheck } from './pivot.js';
 import { calendarReminder, calendarToday } from './calendar.js';
-import { elliottCheck } from './elliott.js';
-import { planCheck } from './plan.js';
+import { elliottCheck, elliottStatus } from './elliott.js';
+import { planCheck, planStatus } from './plan.js';
 
 // Binance chặn một số vùng của Cloudflare, nên thử lần lượt các host.
 const BINANCE_HOSTS = ['https://api-gcp.binance.com', 'https://api.binance.com', 'https://data-api.binance.vision'];
@@ -26,7 +26,11 @@ export class Scanner extends DurableObject {
     if (new URL(request.url).pathname === '/history') {
       const days = Object.fromEntries(await this.ctx.storage.list({ prefix: 'day:' }));
       const coins = parseCoins(this.env.COINS || '').map(({ coin, min }) => ({ coin, min }));
-      return Response.json({ updated: Date.now(), coins, days });
+      // Trạng thái kịch bản Elliott BTC và kế hoạch danh mục (cho trang Tổng quan).
+      const status = {};
+      try { status.elliott = elliottStatus(this.env.ELLIOTT_BTC, await this.ctx.storage.get('elliott:btc')); } catch {}
+      try { status.plan = planStatus(this.env.PLAN, await this.ctx.storage.get('plan:v1')); } catch {}
+      return Response.json({ updated: Date.now(), coins, days, status });
     }
     const { scheduledTime } = await request.json();
     await check(this.env, scheduledTime, this.ctx.storage);

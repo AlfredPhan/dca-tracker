@@ -439,16 +439,30 @@ async function buildEtf() {
 
 // ---------- Lịch sử gom/xả lệnh lớn (từ bot Telegram) ----------
 // Bot cộng dồn lệnh lớn theo nến ngày Binance; link chỉ-đọc /history nằm trong secret BOT_HISTORY_URL của repo.
-async function buildHistory() {
+let botData = null; // lấy 1 lần, dùng cho cả history.json và status.json
+function loadBot() {
   const url = process.env.BOT_HISTORY_URL;
-  if (!url) throw new Error('chưa có secret BOT_HISTORY_URL');
-  const d = await getJson(url);
+  if (!url) return Promise.reject(new Error('chưa có secret BOT_HISTORY_URL'));
+  return (botData ||= getJson(url));
+}
+
+async function buildHistory() {
+  const d = await loadBot();
   const days = Object.entries(d.days || {})
     .map(([k, v]) => ({ d: k.replace('day:', ''), runs: v.runs, first: v.first, coins: v.coins }))
     .sort((a, b) => (a.d < b.d ? -1 : 1));
   if (!days.length) throw new Error('bot chưa có dữ liệu ngày nào');
   console.log(`history: ${days.length} ngày (${days[0].d} → ${days.at(-1).d}), ${d.coins.length} coin`);
   return { updated: Date.now(), thresholds: d.coins, days, coins: Object.fromEntries(d.coins.map((c) => [c.coin, c.min])) };
+}
+
+// ---------- Trạng thái bot cho trang Tổng quan ----------
+// Kịch bản Elliott BTC (đang ở sóng nào, các mức Fib) và kế hoạch bán/giữ từng coin (mức nào bot đã báo).
+async function buildStatus() {
+  const d = await loadBot();
+  if (!d.status?.elliott && !d.status?.plan) throw new Error('bot chưa có trạng thái (cần deploy bản mới của bot)');
+  console.log(`status: Elliott ${d.status.elliott?.phase || '—'}, kế hoạch ${d.status.plan?.length || 0} coin`);
+  return { updated: d.updated, elliott: d.status.elliott || null, plan: d.status.plan || null };
 }
 
 // ---------- Chạy ----------
@@ -460,7 +474,7 @@ async function save(name, build) {
   try {
     const data = await build();
     await writeFile(new URL(name, OUT), JSON.stringify(data));
-    console.log(`${name}: OK (${Object.keys(data.coins).length} coin)`);
+    console.log(`${name}: OK${data.coins ? ` (${Object.keys(data.coins).length} coin)` : ''}`);
   } catch (e) {
     console.error(`${name} lỗi: ${e.message}, giữ bản cũ`);
     const old = await previous(name);
@@ -475,3 +489,4 @@ await save('gold.json', buildGold);
 await save('calendar.json', buildCalendar);
 await save('etf.json', buildEtf);
 await save('history.json', buildHistory);
+await save('status.json', buildStatus);
