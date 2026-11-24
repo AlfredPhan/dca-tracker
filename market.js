@@ -460,7 +460,7 @@ async function renderFngLine() {
 // Dùng các mức Pivot (pivot.js: loadPivotCoin, pv.data, MAIN_LEVELS, PIV_FRAMES) nằm dưới giá hiện tại.
 // Các mức sát nhau (≤1.5%) gộp thành một vùng; khung lớn hơn nặng ký hơn: ngày 1, tuần 2, tháng 3, năm 4 điểm.
 const DCA_BUDGET_KEY = 'dca-zone-budget';
-const DCA_FALLBACK = ['BTC', 'ETH', 'ARB', 'APT', 'FET', 'OP', 'TIA', 'LDO', 'BICO'];
+const DCA_FALLBACK = ['BTC', 'ETH', 'ARB', 'APT', 'FET', 'OP', 'TIA', 'LDO'];
 const DCA_WEIGHT = { d: 1, w: 2, m: 3, y: 4 };
 const DCA_SPLIT = { 1: [1], 2: [0.4, 0.6], 3: [0.25, 0.35, 0.4] }; // vùng càng sâu mua càng nhiều
 const dcaState = { busy: false, budget: (() => { try { return +localStorage.getItem(DCA_BUDGET_KEY) || 100; } catch { return 100; } })() };

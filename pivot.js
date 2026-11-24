@@ -4,7 +4,7 @@
 // tuần mới thứ Hai 7:00, tháng mới ngày 1 lúc 7:00, năm mới 1/1 lúc 7:00.
 
 const PIV_API = 'https://data-api.binance.vision/api/v3';
-const PIV_COINS = ['BTC', 'ETH', 'XAU', 'ARB', 'APT', 'FET', 'OP', 'TIA', 'LDO', 'BICO']; // XAU = vàng
+const PIV_COINS = ['BTC', 'ETH', 'XAU', 'ARB', 'APT', 'FET', 'OP', 'TIA', 'LDO']; // XAU = vàng
 const PIV_FRAMES = [
   { key: 'd', name: 'Ngày', icon: '📅' },
   { key: 'w', name: 'Tuần', icon: '🗓' },

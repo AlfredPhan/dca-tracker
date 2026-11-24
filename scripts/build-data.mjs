@@ -14,7 +14,6 @@ const UA = { 'user-agent': 'Mozilla/5.0 (dca-tracker data builder)', accept: 'ap
 const ONCHAIN = {
   LDO: { chain: 'Ethereum', host: 'eth.blockscout.com', token: '0x5A98FcBEA516Cf06857215779Fd812CA3beF1B32' },
   FET: { chain: 'Ethereum', host: 'eth.blockscout.com', token: '0xaea46A60368A7bD060eec7DF8CBa43b7EF41Ad85' },
-  BICO: { chain: 'Ethereum', host: 'eth.blockscout.com', token: '0xF17e65822b568B3903685a7c9F496CF7656Cc6C2' },
 };
 const MAX_PAGES = 80; // 50 giao dịch/trang
 const DAY = 86400;
