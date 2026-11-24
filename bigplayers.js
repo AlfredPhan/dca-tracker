@@ -36,6 +36,7 @@ function renderBig() {
   const btc = prices.BTC;
   const sig = [];
   $('#bigCost').innerHTML = bigCost(whales, btc, sig);
+  $('#bigMvrv').innerHTML = bigMvrv(whales, btc);
   $('#bigWallets').innerHTML = bigWallets(whales, sig);
   $('#bigFlows').innerHTML = bigFlows(whales, onchain, sig);
   $('#bigEtf').innerHTML = bigEtf(etf, sig);
@@ -97,6 +98,65 @@ function bigCost(w, btc, sig) {
   return `<h2>💰 Giá vốn các nhóm <span class="muted small">(vùng chốt lời, kháng cự, hỗ trợ của tay to)</span></h2>
     ${zone}<div class="ewlist">${html}</div>${planTxt}
     <p class="muted small">Giá vốn = giá BTC lúc mỗi đồng coin được chuyển lần cuối trên blockchain, tính trung bình theo nhóm. Tay mới, tay lâu năm, True Market Mean: BGeometrics (gói miễn phí, trễ khoảng 7 ngày). Giá vốn toàn thị trường và MVRV: Coin Metrics, mới tới hôm qua.</p>`;
+}
+
+// ---------- MVRV qua các chu kỳ + cảnh báo ----------
+// Số liệu theo giá đóng cửa ngày, Coin Metrics (đã tra lại 24/11/2026).
+const MVRV_TOPS = [
+  ['4/2013', 231, 5.64, 5.64], ['12/2013', 1135, 4.72, 5.88], ['12/2017', 19641, 4.43, 4.72], ['4/2021', 63446, 3.43, 3.96],
+  ['11/2021', 67542, 2.85, 2.93], ['3/2024', 73082, 2.75, 2.78], ['12/2024', 106116, 2.68, 2.74], ['10/2025', 124824, 2.29, 2.41],
+];
+const MVRV_BOTTOMS = [['1/2015', 176, 0.56], ['12/2018', 3185, 0.69], ['3/2020', 4959, 0.88], ['11/2022', 15758, 0.75]];
+const MVRV_BUY = [1, 0.9], MVRV_SELL = [2.3, 2.8];
+
+// Giá vốn chung, MVRV hiện tại và cảnh báo (dùng cho cả tab Tay to và trang Tổng quan).
+function mvrvState(w, btc) {
+  const rows = (w?.cm?.btc || []).filter((x) => x.mvrv && x.p);
+  if (!rows.length) return null;
+  const last = rows[rows.length - 1], real = last.p / last.mvrv;
+  const m = btc ? btc / real : last.mvrv;
+  // Phân kỳ (giống bot): giá đóng cửa hôm qua cao nhất 365 ngày, MVRV ≥ 2 nhưng thấp hơn đỉnh MVRV trước ít nhất 5%.
+  let div = null;
+  const prev = rows.slice(-366, -1);
+  if (prev.length >= 200 && last.mvrv >= 2 && last.p > Math.max(...prev.map((r) => r.p))) {
+    const top = prev.reduce((a, b) => (b.mvrv > a.mvrv ? b : a));
+    if (last.mvrv < top.mvrv * 0.95) div = { last, top };
+  }
+  let alert = null;
+  if (div) alert = { cls: 'down', icon: '⚠️', text: `Giá lập đỉnh mới (${BP_FMT(div.last.p)}) nhưng MVRV ${div.last.mvrv.toFixed(2)} thấp hơn mức ${div.top.mvrv.toFixed(2)} ngày ${bpDate(div.top.d)}: tay to có thể đang chốt lời dần. Nên chốt lời từng phần.` };
+  else if (m >= MVRV_SELL[1]) alert = { cls: 'down', icon: '🔴', text: `MVRV ${m.toFixed(2)}: vùng chốt lời mạnh (đỉnh 11/2021: 2.85, 3/2024: 2.75). Cân nhắc chốt lời một phần.` };
+  else if (m >= MVRV_SELL[0]) alert = { cls: 'down', icon: '🔴', text: `MVRV ${m.toFixed(2)}: vùng tay to bắt đầu chốt lời (đỉnh 10/2025: 2.29). Cân nhắc chốt lời một phần.` };
+  else if (m <= MVRV_BUY[1]) alert = { cls: 'up', icon: '🟢', text: `MVRV ${m.toFixed(2)}: giá thấp hơn giá vốn chung hơn 10%, vùng tay to gom mạnh (đáy 2020: 0.88, 2022: 0.75).` };
+  else if (m <= MVRV_BUY[0]) alert = { cls: 'up', icon: '🟢', text: `MVRV ${m.toFixed(2)}: giá dưới giá vốn chung ${BP_FMT(real)}, đa số người giữ đang lỗ. Lịch sử là vùng tay to gom.` };
+  return { real, m, div, alert, day: last.d };
+}
+
+function bigMvrv(w, btc) {
+  const s = mvrvState(w, btc);
+  const head = '<h2>📏 MVRV qua các chu kỳ <span class="muted small">(tay to gom ở đâu, chốt lời ở đâu)</span></h2>';
+  if (!s) return head + '<p class="hint">Chưa có dữ liệu.</p>';
+  const zone = (L) => { const p = s.real * L; return `<span class="zchip ${L <= 1 ? (s.m <= L ? 'in' : '') : (s.m >= L ? 'in' : '')}"><small>MVRV ${L}</small> <b>${BP_FMT(p)}</b>${btc ? ` <small>${bpPct((p / btc - 1) * 100)}</small>` : ''}</span>`; };
+  const banner = s.alert
+    ? `<div class="mvalert ${s.alert.cls}">${s.alert.icon} ${s.alert.text}</div>`
+    : `<div class="mvalert">⚪ MVRV hiện tại <b>${s.m.toFixed(2)}</b>: chưa tới vùng cảnh báo.</div>`;
+  return head + banner + `
+    <div class="mvzones"><span>🟢 Vùng gom</span><div class="zchips">${MVRV_BUY.map(zone).join('')}</div>
+      <span>🔴 Vùng chốt lời</span><div class="zchips">${MVRV_SELL.map(zone).join('')}</div></div>
+    <div class="grid2">
+      <div><h3 class="small">Các đỉnh: tay to chốt lời</h3><div class="tablewrap"><table>
+        <thead><tr><th>Đỉnh</th><th>Giá</th><th>MVRV lúc đỉnh giá</th><th>MVRV cao nhất</th></tr></thead><tbody>
+        ${MVRV_TOPS.map(([d, p, m, mx]) => `<tr><td>${d}</td><td>${BP_FMT(p)}</td><td class="down"><b>${m.toFixed(2)}</b></td><td>${mx.toFixed(2)}</td></tr>`).join('')}
+        </tbody></table></div></div>
+      <div><h3 class="small">Các đáy: tay to gom</h3><div class="tablewrap"><table>
+        <thead><tr><th>Đáy</th><th>Giá</th><th>MVRV</th></tr></thead><tbody>
+        ${MVRV_BOTTOMS.map(([d, p, m]) => `<tr><td>${d}</td><td>${BP_FMT(p)}</td><td class="up"><b>${m.toFixed(2)}</b></td></tr>`).join('')}
+        <tr class="mvnow"><td>Hiện tại</td><td>${BP_FMT(btc)}</td><td><b>${s.m.toFixed(2)}</b></td></tr>
+        </tbody></table></div>
+        <p class="hint">Chu kỳ 2026 tới nay MVRV thấp nhất 1.10 (30/6, giá đóng cửa ngày $58,525), chưa xuống dưới 1.</p></div>
+    </div>
+    <p class="hint">💡 <b>MVRV ở đỉnh thấp dần</b> qua mỗi chu kỳ (5.9 → 4.7 → 3.96 → 2.85 → 2.29): đừng chờ con số của chu kỳ trước.
+      <b>Tay to chốt lời trước đỉnh giá</b>: MVRV thường cao nhất trước đỉnh giá vài tuần đến vài tháng, nên giá lập đỉnh mới mà MVRV thấp hơn là dấu hiệu họ đang xả dần.</p>
+    <p class="muted small">MVRV = giá BTC ÷ giá vốn trung bình của mọi người đang giữ (${BP_FMT(s.real)}, Coin Metrics ngày ${bpDate(s.day)}). Bảng tính theo giá đóng cửa ngày. Bot Telegram cũng báo khi chạm các vùng này và khi có phân kỳ.</p>`;
 }
 
 // ---------- 3. Ví cá voi ----------

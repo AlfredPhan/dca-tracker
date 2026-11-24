@@ -41,3 +41,6 @@ PLAN = "APT:sell:0.41,0.46:0.325;OP:sell:0.078,0.085:0.062;FET:sell:0.118,0.132:
 # Kế hoạch mua BTC từng phần bằng USDT bán altcoin: "vùng1,vùng2,vùng3:mức_xác_nhận". Đặt "0" để tắt.
 #   Chạm vùng nào nhắc mua phần đó; nến tuần đóng trên mức xác nhận (đáy sóng C có thể đã xong) thì nhắc mua nốt.
 BTC_BUY = "55500,51500,48000:66132"
+# Cảnh báo MVRV (giá ÷ giá vốn trung bình): "mức_gom,...:mức_chốt_lời,...". Đặt "0" để tắt.
+#   Kèm cảnh báo phân kỳ: giá lập đỉnh 365 ngày nhưng MVRV thấp hơn đỉnh trước (tay to xả dần).
+MVRV_ALERT = "1,0.9:2.3,2.8"

@@ -18,11 +18,11 @@ async function ovLoad(force) {
   if (!force && Date.now() - ov.at < 5 * 60000) return;
   ov.at = Date.now();
   const get = (name) => loadData(name).catch(() => null);
-  const [status, history, etf, onchain, calendar, unlocks, fng] = await Promise.all([
+  const [status, history, etf, onchain, calendar, unlocks, fng, whales] = await Promise.all([
     get('status.json'), get('history.json'), get('etf.json'), get('onchain.json'), get('calendar.json'), get('unlocks.json'),
-    loadFng().catch(() => null),
+    loadFng().catch(() => null), get('whales.json'),
   ]);
-  Object.assign(ov, { status, history, etf, onchain, calendar, unlocks, fng });
+  Object.assign(ov, { status, history, etf, onchain, calendar, unlocks, fng, whales });
   renderOverview();
 }
 
@@ -54,6 +54,9 @@ function renderOverview() {
   renderOvElliott(btc, focus);
   renderOvMarket(btc);
   renderOvUpcoming(hs, focus);
+  // Cảnh báo MVRV (vùng gom, vùng chốt lời, phân kỳ): hàm mvrvState trong bigplayers.js.
+  const mv = typeof mvrvState === 'function' ? mvrvState(ov.whales, btc) : null;
+  if (mv?.alert) focus.push({ pr: 1, icon: mv.alert.icon, text: `<b>MVRV</b>: ${mv.alert.text}` });
   renderOvFocus(focus);
 }
 
@@ -240,6 +243,8 @@ function renderOvElliott(btc, focus) {
 // ---------- Thị trường ----------
 function renderOvMarket(btc) {
   const lines = [];
+  const mv = typeof mvrvState === 'function' ? mvrvState(ov.whales, btc) : null;
+  if (mv) lines.push(['📏', 'MVRV (giá ÷ giá vốn chung)', `<b class="${mv.m <= 1 ? 'up' : mv.m >= 2.3 ? 'down' : ''}">${mv.m.toFixed(2)}</b> <small class="muted">giá vốn ${ovPx(mv.real)} · gom ≤ 1 · chốt lời ≥ 2.3</small>`]);
   if (ov.fng?.length) {
     const v = ov.fng[0].v, i = fngInfo(v);
     const ago = (k, l) => ov.fng[k] ? `${l} ${ov.fng[k].v}` : '';

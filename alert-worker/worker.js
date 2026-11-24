@@ -10,6 +10,7 @@ import { calendarReminder, calendarToday } from './calendar.js';
 import { elliottCheck, elliottStatus } from './elliott.js';
 import { planCheck, planStatus } from './plan.js';
 import { btcBuyCheck, btcBuyStatus } from './btcbuy.js';
+import { mvrvCheck } from './mvrv.js';
 
 // Binance chặn một số vùng của Cloudflare, nên thử lần lượt các host.
 const BINANCE_HOSTS = ['https://api-gcp.binance.com', 'https://api.binance.com', 'https://data-api.binance.vision'];
@@ -270,6 +271,13 @@ async function check(env, scheduledTime, storage) {
     try {
       for (const m of await btcBuyCheck({ storage, getJson, host, end, cfgStr: env.BTC_BUY })) await sendTelegram(env, m);
     } catch (e) { console.log('btcbuy error:', e.message); }
+  }
+
+  // Cảnh báo MVRV: vùng gom, vùng chốt lời, phân kỳ giá/MVRV (MVRV_ALERT, để trống hoặc "0" để tắt).
+  if (env.MVRV_ALERT && env.MVRV_ALERT !== '0') {
+    try {
+      for (const m of await mvrvCheck({ storage, getJson, host, end, cfgStr: env.MVRV_ALERT })) await sendTelegram(env, m);
+    } catch (e) { console.log('mvrv error:', e.message); }
   }
 
   // Nhắc trước 30 phút khi sắp có tin kinh tế mạnh của Mỹ (CPI, việc làm, Fed...).

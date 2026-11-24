@@ -500,9 +500,9 @@ async function buildWhales(prev) {
     console.log(`whales BGeometrics: ${ok.length}/${Object.keys(BG_SERIES).length} chuỗi (${ok.map((k) => `${k} ${series[k].at(-1)?.[0]}`).join(', ')})`);
   } else console.log(`whales BGeometrics: dùng bản ${Math.round(bgAge / 3600e3)} giờ trước`);
 
-  // Coin Metrics: 120 ngày gần nhất cho BTC và ETH.
+  // Coin Metrics: 400 ngày gần nhất cho BTC và ETH.
   try {
-    const start = new Date(now - 120 * 864e5).toISOString().slice(0, 10);
+    const start = new Date(now - 400 * 864e5).toISOString().slice(0, 10); // 400 ngày: đủ kiểm tra phân kỳ giá/MVRV 365 ngày
     const d = await getJson(`${CM}?assets=btc,eth&metrics=FlowInExNtv,FlowOutExNtv,CapMVRVCur,PriceUSD&frequency=1d&start_time=${start}&page_size=1000`);
     const cm = { at: now, btc: [], eth: [] };
     for (const r of d.data || []) {
