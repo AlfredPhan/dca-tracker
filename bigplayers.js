@@ -107,7 +107,7 @@ const MVRV_TOPS = [
   ['11/2021', 67542, 2.85, 2.93], ['3/2024', 73082, 2.75, 2.78], ['12/2024', 106116, 2.68, 2.74], ['10/2025', 124824, 2.29, 2.41],
 ];
 const MVRV_BOTTOMS = [['1/2015', 176, 0.56], ['12/2018', 3185, 0.69], ['3/2020', 4959, 0.88], ['11/2022', 15758, 0.75]];
-const MVRV_BUY = [1, 0.9], MVRV_SELL = [2.3, 2.8];
+const MVRV_BUY = [1, 0.9, 0.8], MVRV_SELL = [2.3, 2.8];
 
 // Giá vốn chung, MVRV hiện tại và cảnh báo (dùng cho cả tab Tay to và trang Tổng quan).
 function mvrvState(w, btc) {
@@ -126,9 +126,35 @@ function mvrvState(w, btc) {
   if (div) alert = { cls: 'down', icon: '⚠️', text: `Giá lập đỉnh mới (${BP_FMT(div.last.p)}) nhưng MVRV ${div.last.mvrv.toFixed(2)} thấp hơn mức ${div.top.mvrv.toFixed(2)} ngày ${bpDate(div.top.d)}: tay to có thể đang chốt lời dần. Nên chốt lời từng phần.` };
   else if (m >= MVRV_SELL[1]) alert = { cls: 'down', icon: '🔴', text: `MVRV ${m.toFixed(2)}: vùng chốt lời mạnh (đỉnh 11/2021: 2.85, 3/2024: 2.75). Cân nhắc chốt lời một phần.` };
   else if (m >= MVRV_SELL[0]) alert = { cls: 'down', icon: '🔴', text: `MVRV ${m.toFixed(2)}: vùng tay to bắt đầu chốt lời (đỉnh 10/2025: 2.29). Cân nhắc chốt lời một phần.` };
+  else if (m <= MVRV_BUY[2]) alert = { cls: 'up', icon: '🟢', text: `MVRV ${m.toFixed(2)}: vùng đáy sâu của lịch sử (đáy 2018: 0.69, 2022: 0.75). Mua phần BTC cuối, kiên nhẫn: giá có thể nằm vùng này vài tháng.` };
   else if (m <= MVRV_BUY[1]) alert = { cls: 'up', icon: '🟢', text: `MVRV ${m.toFixed(2)}: giá thấp hơn giá vốn chung hơn 10%, vùng tay to gom mạnh (đáy 2020: 0.88, 2022: 0.75).` };
   else if (m <= MVRV_BUY[0]) alert = { cls: 'up', icon: '🟢', text: `MVRV ${m.toFixed(2)}: giá dưới giá vốn chung ${BP_FMT(real)}, đa số người giữ đang lỗ. Lịch sử là vùng tay to gom.` };
-  return { real, m, div, alert, day: last.d };
+  // Giai đoạn kế hoạch MVRV (giống bot, theo giá đóng cửa ngày): 1 đỡ giá đầu · 2 thủng giá vốn · 3 vùng đáy · 4 xác nhận đáy.
+  const iTop = rows.reduce((b, r, i) => (r.p > rows[b].p ? i : b), 0);
+  const below = rows.slice(iTop).filter((r) => r.mvrv < 1).length;
+  const held = rows.slice(-30).every((r) => r.mvrv >= 1);
+  const stage = below >= 30 && held ? 4 : last.mvrv < 0.9 ? 3 : last.mvrv < 1 ? 2 : 1;
+  const cycMin = rows.slice(iTop).reduce((a, b) => (b.mvrv < a.mvrv ? b : a));
+  return { real, m, div, alert, day: last.d, stage, below, cycMin, lastClose: last.mvrv };
+}
+
+const MVRV_STAGES = [
+  ['Đỡ giá giai đoạn đầu', 'MVRV trên 1', 'Năm 2014 và 2018, vùng 1.1–1.3 đỡ giá nhiều lần (bật 20–80%) rồi vẫn thủng. Mua phần nhỏ, giữ phần lớn USDT.'],
+  ['Thủng giá vốn', 'Nến ngày đóng dưới 1', 'Bắt đầu vùng tạo đáy (11/2018, 6/2022). Mua thêm từng phần.'],
+  ['Vùng đáy lịch sử', 'Dưới 0.9', 'Đáy thật 2015, 2018, 2022 ở MVRV 0.56–0.75. Giá thường nằm vùng 0.8–1 khoảng 100–230 ngày: mua phần 3, 4, kiên nhẫn.'],
+  ['Xác nhận đáy', 'Quay lại và giữ trên 1 suốt 30 ngày', 'Giống 5/2019, 2/2023: thị trường tăng mới bắt đầu. Mua nốt phần còn lại.'],
+];
+
+function mvrvPlan(s, btc) {
+  const steps = MVRV_STAGES.map(([name, cond, tip], i) => `<div class="mvstep ${i + 1 === s.stage ? 'on' : i + 1 < s.stage ? 'done' : ''}">
+    <b>${i + 1}. ${name}</b><small>${cond}</small><span>${tip}</span></div>`).join('');
+  const plan = typeof ov !== 'undefined' ? ov.status?.btcBuy : null;
+  const parts = plan ? `<p class="hint">Kế hoạch mua BTC của bạn theo MVRV: ${plan.levels.map((p, i) =>
+    `phần ${i + 1} <b>${BP_FMT(p)}</b> (MVRV ${(p / s.real).toFixed(2)})`).join(' · ')}${plan.chase ? ` · nến tuần trên <b>${BP_FMT(plan.chase)}</b> thì mua nốt` : ''}.</p>` : '';
+  return `<h3 class="small">🧭 Kế hoạch theo MVRV · đang ở <b>giai đoạn ${s.stage}</b></h3>
+    <div class="mvsteps">${steps}</div>
+    <p class="hint">Chu kỳ này (từ đỉnh 10/2025): MVRV đóng cửa thấp nhất <b>${s.cycMin.mvrv.toFixed(2)}</b> ngày ${bpDate(s.cycMin.d)} ·
+      số ngày đóng cửa dưới 1: <b>${s.below}</b> (các chu kỳ trước: 133–304 ngày) · hôm qua đóng cửa MVRV <b>${s.lastClose.toFixed(2)}</b>.</p>${parts}`;
 }
 
 function bigMvrv(w, btc) {
@@ -139,7 +165,7 @@ function bigMvrv(w, btc) {
   const banner = s.alert
     ? `<div class="mvalert ${s.alert.cls}">${s.alert.icon} ${s.alert.text}</div>`
     : `<div class="mvalert">⚪ MVRV hiện tại <b>${s.m.toFixed(2)}</b>: chưa tới vùng cảnh báo.</div>`;
-  return head + banner + `
+  return head + banner + mvrvPlan(s, btc) + `
     <div class="mvzones"><span>🟢 Vùng gom</span><div class="zchips">${MVRV_BUY.map(zone).join('')}</div>
       <span>🔴 Vùng chốt lời</span><div class="zchips">${MVRV_SELL.map(zone).join('')}</div></div>
     <div class="grid2">

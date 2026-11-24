@@ -39,6 +39,39 @@ export function divergence(rows) {
   return null;
 }
 
+// Kế hoạch theo MVRV (rút ra từ các thị trường giảm 2011–2023), tính theo giá đóng cửa ngày:
+//   1 = đỡ giá giai đoạn đầu (MVRV ≥ 1): 2014, 2018 đỡ nhiều lần ở 1.1–1.3 rồi vẫn thủng.
+//   2 = thủng giá vốn (MVRV < 1): bắt đầu vùng tạo đáy.
+//   3 = vùng đáy lịch sử (MVRV < 0.9): đáy thật 2015/2018/2022 ở 0.56–0.75, giá nằm vùng 0.8–1 khoảng 100–230 ngày.
+//   4 = xác nhận đáy: sau ít nhất 30 ngày dưới 1, MVRV quay lại và giữ trên 1 suốt 30 ngày (giống 5/2019, 2/2023).
+//       Kiểm tra lịch sử: giữ 7 hay 14 ngày từng báo sai (7/2015, 8/2022); giữ 30 ngày thì sau khi báo giá chỉ giảm thêm 2–7% (trừ 2012).
+export function mvrvPhase(rows) {
+  const iTop = rows.reduce((b, r, i) => (r.p > rows[b].p ? i : b), 0);
+  const cyc = rows.slice(iTop);
+  const below = cyc.filter((r) => r.m < 1).length;
+  const last = rows[rows.length - 1], prev = rows[rows.length - 2] || last;
+  const held = rows.slice(-30).every((r) => r.m >= 1);
+  const stage = below >= 30 && held ? 4 : last.m < 0.9 ? 3 : last.m < 1 ? 2 : 1;
+  return {
+    stage, below, last, prev,
+    broke: last.m < 1 && prev.m >= 1,
+    deep: last.m < 0.9 && prev.m >= 0.9,
+    back: below >= 30 && last.m >= 1 && prev.m < 1,
+    confirm: below >= 30 && held && (rows[rows.length - 31]?.m ?? 1) < 1,
+  };
+}
+
+function phaseLines(ph, real) {
+  const L = [];
+  const zone = `${fmt(real * 0.75)}–${fmt(real * 0.9)}`;
+  if (ph.confirm) L.push(`✅ <b>Giai đoạn 4: xác nhận đáy</b>. MVRV giữ trên 1 suốt 30 ngày sau ${ph.below} ngày dưới giá vốn chung, giống 5/2019 và 2/2023 khi thị trường tăng mới bắt đầu. Mua nốt phần BTC còn lại, không chờ giá về thấp nữa.`);
+  else if (ph.back) L.push(`🟢 MVRV đóng cửa ngày <b>quay lại trên 1</b> (${ph.last.m.toFixed(2)}) sau ${ph.below} ngày dưới giá vốn chung. Chờ giữ được 30 ngày liên tục để xác nhận đáy (lịch sử từng có lần quay lại trên 1 rồi rơi tiếp: 7/2015, 8/2022).`);
+  if (ph.deep) L.push(`🟢 <b>Giai đoạn 3: vùng đáy lịch sử</b>. Nến ngày đóng ở MVRV ${ph.last.m.toFixed(2)} (dưới 0.9). Đáy thật 2015, 2018, 2022 nằm ở MVRV 0.56–0.75, giá thường dao động vùng 0.75–0.9 (≈ ${zone}) nhiều tháng. Mua BTC phần 3, 4 từng chút, kiên nhẫn.`);
+  else if (ph.broke) L.push(`📉 <b>Giai đoạn 2: thủng giá vốn chung</b>. Nến ngày đóng ở MVRV ${ph.last.m.toFixed(2)} (BTC ${fmt(ph.last.p)}, giá vốn ${fmt(real)}). Vùng 1.1 đỡ giá nhiều lần đã thủng, giống 11/2018 và 6/2022.\n` +
+    `Lịch sử: đáy thật thường ở MVRV 0.75–0.9 (≈ ${zone}), giá nằm vùng 0.8–1 khoảng 100–230 ngày. Mua BTC từng phần theo kế hoạch, không dồn hết một lần.`);
+  return L;
+}
+
 export async function mvrvCheck({ storage, getJson, host, end, cfgStr }) {
   const cfg = parseMvrv(cfgStr);
   if (!cfg || !host) return [];
@@ -54,6 +87,19 @@ export async function mvrvCheck({ storage, getJson, host, end, cfgStr }) {
       const last = rows[rows.length - 1];
       const isNew = last.d !== st.realDay;
       st.real = last.p / last.m; st.realAt = end; st.realDay = last.d;
+      // Giai đoạn kế hoạch MVRV theo nến ngày vừa có số.
+      const ph = mvrvPhase(rows);
+      st.stage = ph.stage; st.below = ph.below;
+      if (isNew && !fresh) {
+        // MVRV hay cắt qua lại mức 1 nhiều lần trong vài ngày (VD 2022): mỗi loại tin tối đa 1 lần mỗi 30 ngày.
+        st.evAt ||= {};
+        for (const ev of ['broke', 'deep', 'back', 'confirm']) {
+          if (!ph[ev]) continue;
+          if (end - (st.evAt[ev] || 0) < 30 * DAY) ph[ev] = false; else st.evAt[ev] = end;
+        }
+        const pl = phaseLines(ph, st.real);
+        if (pl.length) out.push(`${HEAD}\n${pl.join('\n\n')}`);
+      }
       const dv = isNew && !fresh ? divergence(rows) : null;
       if (dv && end - (st.divAt || 0) > 30 * DAY) {
         st.divAt = end;
@@ -75,7 +121,13 @@ export async function mvrvCheck({ storage, getJson, host, end, cfgStr }) {
     out.push(`${HEAD} · bắt đầu theo dõi\nGiá vốn trung bình của mọi người giữ BTC: <b>${fmt(st.real)}</b>. MVRV hiện tại <b>${m.toFixed(2)}</b> (BTC ${fmt(last)}).\n` +
       (cfg.buy.length ? `🟢 Vùng gom: ${cfg.buy.map((L) => `MVRV ${L} ≈ ${fmt(st.real * L)}`).join(' · ')}\n` : '') +
       (cfg.sell.length ? `🔴 Vùng chốt lời: ${cfg.sell.map((L) => `MVRV ${L} ≈ ${fmt(st.real * L)}`).join(' · ')}\n` : '') +
-      `⚠️ Báo thêm khi giá lập đỉnh mới nhưng MVRV thấp hơn (tay to xả dần).\n<i>Giá vốn cập nhật mỗi ngày nên các mức giá dịch chuyển chậm theo.</i>`);
+      `⚠️ Báo thêm khi giá lập đỉnh mới nhưng MVRV thấp hơn (tay to xả dần).\n\n` +
+      `<b>Kế hoạch theo MVRV</b> (nến ngày), hiện ở <b>giai đoạn ${st.stage || 1}</b>:\n` +
+      `1️⃣ Trên 1: đỡ giá giai đoạn đầu (2014, 2018 đỡ ở 1.1–1.3 nhiều lần rồi vẫn thủng)\n` +
+      `2️⃣ Đóng cửa dưới 1: thủng giá vốn, bắt đầu vùng tạo đáy\n` +
+      `3️⃣ Dưới 0.9: vùng đáy lịch sử (0.75–0.9 ≈ ${fmt(st.real * 0.75)}–${fmt(st.real * 0.9)})\n` +
+      `4️⃣ Quay lại và giữ trên 1 suốt 30 ngày: xác nhận đáy\n` +
+      `<i>Giá vốn cập nhật mỗi ngày nên các mức giá dịch chuyển chậm theo.</i>`);
     await storage.put(KEY, st);
     return out;
   }
