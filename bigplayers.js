@@ -49,9 +49,10 @@ function bigVerdict(sig, whales) {
   const score = sig.reduce((s, x) => s + x.score, 0);
   const [cl, text] = score >= 2 ? ['up', '🟢 Tay to nghiêng về GOM'] : score <= -2 ? ['down', '🔴 Tay to nghiêng về XẢ'] : ['', '⚪ Tay to chưa nghiêng rõ'];
   return `<h2>🦈 Tay to đang làm gì?</h2>
-    <div class="scorehead"><span class="scorenum ${cl}">${score > 0 ? '+' : ''}${score}<small>/${sig.length}</small></span><span class="verdict ${cl}">${text}</span></div>
-    ${sig.map((s) => `<div class="sig"><span>${s.score > 0 ? '🟢' : s.score < 0 ? '🔴' : '⚪'}</span><b>${s.name}</b><span class="muted">${s.text}</span><span>${s.score > 0 ? '+1' : s.score < 0 ? '−1' : '0'}</span></div>`).join('')}
-    <p class="muted small">Mỗi nguồn +1 (ủng hộ gom), −1 (ủng hộ xả) hoặc 0. Đây là suy luận từ dữ liệu công khai, không ai biết chắc ý định của tay to. Số liệu on-chain theo ngày nên phản ánh xu hướng vài ngày đến vài tuần, không phải từng giờ.</p>`;
+    <div class="scorehead"><span class="scorenum ${cl}">${score > 0 ? '+' : score < 0 ? '−' : ''}${Math.abs(score)}<small> điểm</small></span><span class="verdict ${cl}">${text}</span>
+      <span class="small"><b class="up">${sig.filter((s) => s.score > 0).length} gom</b> · <b class="down">${sig.filter((s) => s.score < 0).length} xả</b> · <b class="muted">${sig.filter((s) => !s.score).length} trung lập</b></span></div>
+    ${sig.map((s) => `<div class="sig"><span>${s.score > 0 ? '🟢' : s.score < 0 ? '🔴' : '⚪'}</span><b>${s.name}</b><span class="muted">${s.text}</span><b class="${cls(s.score)}">${s.score > 0 ? '+1' : s.score < 0 ? '−1' : '0'}</b></div>`).join('')}
+    <p class="muted small">Điểm = cộng các dòng: mỗi nguồn +1 (ủng hộ gom), −1 (ủng hộ xả) hoặc 0. Từ +2 trở lên là nghiêng gom, từ −2 trở xuống là nghiêng xả. Đây là suy luận từ dữ liệu công khai, không ai biết chắc ý định của tay to. Số liệu on-chain theo ngày nên phản ánh xu hướng vài ngày đến vài tuần, không phải từng giờ.</p>`;
 }
 
 // ---------- 2. Giá vốn các nhóm ----------

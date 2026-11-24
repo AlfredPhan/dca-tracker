@@ -144,8 +144,9 @@ function renderScore() {
   }).join('');
   $('#wScore').innerHTML = `
     <div class="scorehead">
-      <span class="scorenum ${cls(total)}">${total > 0 ? '+' : ''}${total}<small class="muted">/${done.length}</small></span>
+      <span class="scorenum ${cls(total)}">${total > 0 ? '+' : total < 0 ? '−' : ''}${Math.abs(total)}<small> điểm</small></span>
       <span class="verdict ${verdict[1]}">${verdict[0]}</span>
+      <span class="small"><b class="up">${done.filter(([k]) => w.sig[k].score > 0).length} gom</b> · <b class="down">${done.filter(([k]) => w.sig[k].score < 0).length} xả</b> · <b class="muted">${done.filter(([k]) => !w.sig[k].score).length} trung lập</b></span>
     </div>
     ${rows}
     <p class="hint">Mỗi tiêu chí +1 (ủng hộ gom), −1 (ủng hộ xả) hoặc 0; ➖ là không áp dụng cho coin này. Từ +3 trở lên là gom rõ, từ −3 trở xuống là xả rõ.
