@@ -245,7 +245,7 @@ function renderOvMarket(btc) {
     const ago = (k, l) => ov.fng[k] ? `${l} ${ov.fng[k].v}` : '';
     lines.push(['😶', 'Tâm lý (Fear &amp; Greed)', `<b style="color:${i.color}">${v} · ${i.name}</b> <small class="muted">${[ago(1, 'hôm qua'), ago(7, '7 ngày trước')].filter(Boolean).join(' · ')}</small>`]);
   }
-  const etf = ov.etf?.coins?.BTC;
+  const etf = (ov.etf?.coins?.BTC || []).filter((x) => x.total || Object.values(x.funds || {}).some((v) => v)); // bỏ phiên chưa có số
   if (etf?.length) {
     const last = etf[etf.length - 1], s5 = etf.slice(-5).reduce((s, x) => s + x.total, 0);
     lines.push(['🏦', 'Quỹ ETF BTC', `phiên ${last.d.slice(8, 10)}/${last.d.slice(5, 7)}: <b class="${cls(last.total)}">${etfM(last.total)}</b> · 5 phiên: <b class="${cls(s5)}">${etfM(s5)}</b>

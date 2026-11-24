@@ -455,6 +455,67 @@ async function buildHistory() {
   return { updated: Date.now(), thresholds: d.coins, days, coins: Object.fromEntries(d.coins.map((c) => [c.coin, c.min])) };
 }
 
+// ---------- Tay to: giá vốn các nhóm, ví cá voi, nạp/rút toàn bộ sàn ----------
+// BGeometrics (bitcoin-data.com, gói miễn phí: 15 lần gọi/ngày, một số chỉ số trễ 7 ngày): lấy 1 lần mỗi ngày.
+// Coin Metrics Community API (miễn phí, giấy phép CC BY-NC 4.0): MVRV và tổng BTC/ETH nạp/rút mọi sàn theo ngày.
+const BG = 'https://bitcoin-data.com/v1/';
+const BG_SERIES = {
+  sth: 'sth-realized-price',        // giá vốn tay mới (giữ dưới 155 ngày)
+  lth: 'lth-realized-price',        // giá vốn tay lâu năm
+  real: 'realized-price',           // giá vốn trung bình toàn thị trường
+  tmm: 'true-market-mean',          // giá vốn của nhà đầu tư đang hoạt động (bỏ coin ngủ đông, coin thợ đào)
+  w10k: 'coins-addr-10K-BTC',       // tổng BTC trong ví trên 10,000 BTC
+  w1k: 'coins-addr-10K-1K-BTC',     // ví 1,000–10,000 BTC (cá voi)
+  w100: 'coins-addr-1K-100-BTC',    // ví 100–1,000 BTC (cá mập)
+};
+const CM = 'https://community-api.coinmetrics.io/v4/timeseries/asset-metrics';
+
+async function bgSeries(path, startday) {
+  // Không thử lại khi bị giới hạn (429), để khỏi tốn lượt gọi trong ngày.
+  const res = await fetch(`${BG}${path}?startday=${startday}&size=400`, { headers: UA });
+  if (!res.ok) throw new Error(`BGeometrics ${path}: HTTP ${res.status}`);
+  const d = await res.json();
+  const rows = Array.isArray(d) ? d : d.content || [];
+  return rows.map((r) => {
+    const k = Object.keys(r).find((x) => !['d', 'unixTs', 'delayed', 'message'].includes(x));
+    return [r.d, +r[k]];
+  }).filter(([d, v]) => d && isFinite(v) && v > 0);
+}
+
+async function buildWhales(prev) {
+  const now = Date.now();
+  const out = { updated: now, bg: prev?.bg || null, cm: prev?.cm || null };
+  // BGeometrics: dữ liệu cập nhật mỗi ngày lúc 03:00 UTC. Có bản < 20 giờ thì dùng lại; lỗi thì 6 giờ sau mới thử lại.
+  const bgAge = now - (out.bg?.at || 0), bgTried = now - (prev?.bgTried || 0);
+  out.bgTried = prev?.bgTried || 0;
+  if (bgAge > 20 * 3600e3 && bgTried > 6 * 3600e3) {
+    out.bgTried = now;
+    const start = new Date(now - 200 * 864e5).toISOString().slice(0, 10);
+    const series = {};
+    for (const [key, path] of Object.entries(BG_SERIES)) {
+      try { series[key] = await bgSeries(path, start); } catch (e) { console.error(e.message); }
+    }
+    const ok = Object.keys(series).filter((k) => series[k].length);
+    if (ok.length >= 4) out.bg = { at: now, series: { ...(out.bg?.series || {}), ...Object.fromEntries(ok.map((k) => [k, series[k]])) } };
+    console.log(`whales BGeometrics: ${ok.length}/${Object.keys(BG_SERIES).length} chuỗi (${ok.map((k) => `${k} ${series[k].at(-1)?.[0]}`).join(', ')})`);
+  } else console.log(`whales BGeometrics: dùng bản ${Math.round(bgAge / 3600e3)} giờ trước`);
+
+  // Coin Metrics: 120 ngày gần nhất cho BTC và ETH.
+  try {
+    const start = new Date(now - 120 * 864e5).toISOString().slice(0, 10);
+    const d = await getJson(`${CM}?assets=btc,eth&metrics=FlowInExNtv,FlowOutExNtv,CapMVRVCur,PriceUSD&frequency=1d&start_time=${start}&page_size=1000`);
+    const cm = { at: now, btc: [], eth: [] };
+    for (const r of d.data || []) {
+      cm[r.asset]?.push({ d: r.time.slice(0, 10), in: +r.FlowInExNtv || 0, out: +r.FlowOutExNtv || 0, mvrv: +r.CapMVRVCur || null, p: +r.PriceUSD || null });
+    }
+    if (!cm.btc.length) throw new Error('không có dữ liệu');
+    out.cm = cm;
+    console.log(`whales Coin Metrics: ${cm.btc.length} ngày BTC, mới nhất ${cm.btc.at(-1).d}`);
+  } catch (e) { console.error(`whales Coin Metrics lỗi: ${e.message}, giữ bản cũ`); }
+  if (!out.bg && !out.cm) throw new Error('chưa có dữ liệu tay to');
+  return out;
+}
+
 // ---------- Trạng thái bot cho trang Tổng quan ----------
 // Kịch bản Elliott BTC (đang ở sóng nào, các mức Fib) và kế hoạch bán/giữ từng coin (mức nào bot đã báo).
 async function buildStatus() {
@@ -489,3 +550,5 @@ await save('calendar.json', buildCalendar);
 await save('etf.json', buildEtf);
 await save('history.json', buildHistory);
 await save('status.json', buildStatus);
+const prevWhales = await previous('whales.json');
+await save('whales.json', () => buildWhales(prevWhales));

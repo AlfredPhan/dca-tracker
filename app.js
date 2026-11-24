@@ -100,6 +100,8 @@ function render() {
   renderSimOptions(hs);
   renderSim();
   if (typeof renderDcaZones === 'function') renderDcaZones(hs); // market.js
+  if (typeof renderOverview === 'function') { renderOverview(); ovLoad24h(); } // overview.js
+  if (typeof renderBig === 'function') renderBig(); // bigplayers.js
 }
 
 function renderSummary(hs) {

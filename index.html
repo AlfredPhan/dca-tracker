@@ -10,7 +10,7 @@
   <meta name="theme-color" content="#f5f6f8" media="(prefers-color-scheme: light)">
   <meta name="theme-color" content="#181c22" media="(prefers-color-scheme: dark)">
   <title>Altcoin DCA Tracker</title>
-  <link rel="stylesheet" href="style.css?v=202611241000">
+  <link rel="stylesheet" href="style.css?v=202611241500">
 </head>
 <body>
   <header class="topbar">
@@ -50,6 +50,7 @@
     <button class="tab active" data-tab="overview">📋 Tổng quan</button>
     <button class="tab" data-tab="portfolio">💼 Danh mục</button>
     <button class="tab" data-tab="whale">🐋 Cá voi</button>
+    <button class="tab" data-tab="big">🦈 Tay to</button>
     <button class="tab" data-tab="gold">🥇 Vàng</button>
     <button class="tab" data-tab="pivot">📐 Pivot</button>
   </nav>
@@ -168,6 +169,20 @@
         <div id="wWalls"></div>
       </div>
     </section>
+  </main>
+
+  <main id="tab-big" hidden>
+    <section class="card" id="bigVerdict"></section>
+    <section class="card" id="bigCost"></section>
+    <section class="grid2">
+      <div class="card" id="bigWallets"></div>
+      <div class="card" id="bigEtf"></div>
+    </section>
+    <section class="grid2">
+      <div class="card" id="bigFlows"></div>
+      <div class="card" id="bigOrders"></div>
+    </section>
+    <p class="muted small ovnote">Tay to = cá voi, quỹ ETF, tổ chức nắm lượng BTC lớn. Không ai thấy trực tiếp lệnh của họ: tab này ước lượng từ dữ liệu on-chain, quỹ ETF và lệnh lớn trên sàn. Tham khảo, không phải lời khuyên đầu tư.</p>
   </main>
 
   <main id="tab-gold" hidden>
@@ -370,12 +385,13 @@
   </main>
 
   <footer class="muted small">Dữ liệu chỉ lưu trên trình duyệt này. Nhớ bấm “Xuất” để sao lưu. Giá lấy từ Binance.</footer>
-  <script src="app.js?v=202611241000"></script>
-  <script src="whale.js?v=202611241000"></script>
-  <script src="gold.js?v=202611241000"></script>
-  <script src="pivot.js?v=202611241000"></script>
-  <script src="market.js?v=202611241000"></script>
-  <script src="overview.js?v=202611241000"></script>
-  <script src="sync.js?v=202611241000"></script>
+  <script src="app.js?v=202611241500"></script>
+  <script src="whale.js?v=202611241500"></script>
+  <script src="gold.js?v=202611241500"></script>
+  <script src="pivot.js?v=202611241500"></script>
+  <script src="market.js?v=202611241500"></script>
+  <script src="overview.js?v=202611241500"></script>
+  <script src="bigplayers.js?v=202611241500"></script>
+  <script src="sync.js?v=202611241500"></script>
 </body>
 </html>
