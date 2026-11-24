@@ -109,6 +109,7 @@ async function binanceTrades(host, coin, start, end) {
 
 // Tổng mua/bán chủ động của mọi lệnh từ 100 USD trở lên (chỉ để vẽ biểu đồ trên web, không gửi tin nhắn).
 const ALL_MIN = 100;
+const BIG_WEB = 100000; // ngưỡng lệnh tay to cho tab Tay to trên web
 
 async function okxTrades(coin, start, end) {
   const inst = `${coin}-USDT`;
@@ -203,9 +204,12 @@ async function check(env, scheduledTime, storage) {
         const c = (tally[coin] ||= { b: 0, s: 0, nb: 0, ns: 0 });
         c.ab ||= 0; c.as ||= 0; c.anb ||= 0; c.ans ||= 0; c.acut ||= 0;
         c.amin = (c.amin || 0) + 1; // số phút đã ghi (để biết ngày nào đủ 24 giờ)
+        c.hb ||= 0; c.hs ||= 0; c.hnb ||= 0; c.hns ||= 0; c.hmin = (c.hmin || 0) + 1;
         for (const t of trades) {
           if (t.value < ALL_MIN) continue;
           if (t.sell) { c.as += t.value; c.ans++; } else { c.ab += t.value; c.anb++; }
+          // Lệnh từ 100K USD (tab Tay to trên web): hb/hs = mua/bán, hnb/hns = số lệnh, hmin = số phút đã ghi.
+          if (t.value >= BIG_WEB) { if (t.sell) { c.hs += t.value; c.hns++; } else { c.hb += t.value; c.hnb++; } }
         }
         if (trades.cut) c.acut++;
       }

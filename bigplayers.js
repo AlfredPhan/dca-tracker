@@ -184,20 +184,25 @@ function bigEtf(etf, sig) {
 }
 
 // ---------- 6. Lệnh lớn trên Binance (bot ghi) ----------
+// Bot ghi riêng mọi lệnh BTC từ 100K USD (hb/hs) kể từ 24/11/2026; ngày cũ hơn chưa có số này.
 function bigOrders(history, sig) {
-  const days = (history?.days || []).filter((d) => d.coins?.BTC).slice(-14);
-  const min = history?.coins?.BTC;
-  if (!days.length || !min) return `<h2>🐳 Lệnh lớn BTC trên Binance</h2><p class="hint">Chưa có dữ liệu từ bot.</p>`;
-  const vals = days.map((d) => (d.coins.BTC.b || 0) - (d.coins.BTC.s || 0));
-  const last7 = days.slice(-7), b7 = last7.reduce((s, d) => s + (d.coins.BTC.b || 0), 0), s7 = last7.reduce((s, d) => s + (d.coins.BTC.s || 0), 0);
-  const today = days[days.length - 1].coins.BTC;
-  sig.push({ name: `Lệnh lớn Binance (${last7.length} ngày)`, score: b7 > s7 * 1.1 ? 1 : s7 > b7 * 1.1 ? -1 : 0,
-    text: `Mua ${fmtUsdShort(b7)} · bán ${fmtUsdShort(s7)} (lệnh từ ${fmtUsdShort(min)}).` });
-  return `<div class="row between"><h2>🐳 Lệnh lớn BTC trên Binance</h2><button class="ghost small" data-go="whale">Cá voi →</button></div>
-    <p class="hint">Hôm nay (từ 7:00): mua <b class="up">${fmtUsdShort(today.b || 0)}</b> (${today.nb || 0} lệnh) · bán <b class="down">${fmtUsdShort(today.s || 0)}</b> (${today.ns || 0} lệnh)</p>
-    <p class="hint">${last7.length} ngày: mua <b class="up">${fmtUsdShort(b7)}</b> · bán <b class="down">${fmtUsdShort(s7)}</b> → <b class="${cls(b7 - s7)}">${b7 >= s7 ? 'gom' : 'xả'} ${fmtUsdShort(Math.abs(b7 - s7))}</b></p>
+  const days = (history?.days || []).filter((d) => d.coins?.BTC?.hmin).slice(-14);
+  const head = `<div class="row between"><h2>🐳 Lệnh BTC từ $100K trên Binance</h2><button class="ghost small" data-go="whale">Cá voi →</button></div>`;
+  if (!days.length) return head + `<p class="hint">Bot bắt đầu ghi lệnh từ $100K từ ngày 24/11/2026. Số liệu sẽ hiện sau lần cập nhật kế tiếp (mỗi giờ).</p>`;
+  const B = (d) => d.coins.BTC;
+  const vals = days.map((d) => (B(d).hb || 0) - (B(d).hs || 0));
+  const last7 = days.slice(-7);
+  const sum = (k) => last7.reduce((s, d) => s + (B(d)[k] || 0), 0);
+  const b7 = sum('hb'), s7 = sum('hs'), nb7 = sum('hnb'), ns7 = sum('hns');
+  const today = B(days[days.length - 1]);
+  const partial = today.hmin < 1380 ? ` <small class="muted">(đã ghi ${Math.floor(today.hmin / 60)} giờ ${today.hmin % 60} phút)</small>` : '';
+  sig.push({ name: `Lệnh BTC từ $100K (${last7.length} ngày)`, score: b7 > s7 * 1.1 ? 1 : s7 > b7 * 1.1 ? -1 : 0,
+    text: `Mua ${fmtUsdShort(b7)} (${nb7} lệnh) · bán ${fmtUsdShort(s7)} (${ns7} lệnh) trên Binance.` });
+  return head + `
+    <p class="hint">Hôm nay (từ 7:00)${partial}: mua <b class="up">${fmtUsdShort(today.hb || 0)}</b> (${today.hnb || 0} lệnh) · bán <b class="down">${fmtUsdShort(today.hs || 0)}</b> (${today.hns || 0} lệnh)</p>
+    ${last7.length > 1 ? `<p class="hint">${last7.length} ngày: mua <b class="up">${fmtUsdShort(b7)}</b> · bán <b class="down">${fmtUsdShort(s7)}</b> → <b class="${cls(b7 - s7)}">${b7 >= s7 ? 'gom' : 'xả'} ${fmtUsdShort(Math.abs(b7 - s7))}</b></p>` : ''}
     ${days.length > 1 ? bigBars(vals, days.map((d) => bpDate(d.d))) : ''}
-    <p class="muted small">Mỗi lệnh khớp từ ${fmtUsdShort(min)} trở lên trên Binance spot (đúng như bot báo Telegram), cộng theo ngày. Chỉ một sàn, và bot chỉ ghi từ lúc bắt đầu chạy.</p>`;
+    <p class="muted small">Mọi lệnh khớp từ $100K trở lên trên Binance spot (BTC/USDT), chia theo bên chủ động mua hoặc bán, cộng theo nến ngày (7:00 sáng). Bot ghi từ 24/11/2026 nên lịch sử dài dần theo thời gian. Chỉ một sàn: tay to giao dịch ở sàn khác hoặc OTC thì không thấy.</p>`;
 }
 
 document.querySelector('.tab[data-tab="big"]').addEventListener('click', startBig);
