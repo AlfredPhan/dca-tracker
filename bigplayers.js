@@ -321,7 +321,7 @@ function bigWallets(w, sig) {
   }).join('');
   const date = bpLast(s[groups[0][0]])?.[0];
   return `<h2>🐋 Ví cá voi đang giữ bao nhiêu BTC</h2>${rows}
-    <p class="muted small">Tổng BTC nằm trong các ví theo cỡ, 180 ngày gần nhất, số ngày ${date ? bpDate(date) : ''}. Nguồn BGeometrics. Một tổ chức có thể có nhiều ví, và sàn hay gộp/tách ví, nên chỉ nên xem xu hướng tăng hay giảm, không xem từng ngày.</p>`;
+    <p class="muted small">Tổng BTC nằm trong các ví theo cỡ, 180 ngày gần nhất, số liệu ngày ${date ? bpDate(date) : ''}. Nguồn BGeometrics. Một tổ chức có thể có nhiều ví, và sàn hay gộp/tách ví, nên chỉ nên xem xu hướng tăng hay giảm, không xem từng ngày.</p>`;
 }
 
 // ---------- 4. Nạp/rút sàn ----------
@@ -356,7 +356,7 @@ function bigFlows(w, onchain, sig) {
       </tbody></table></div>`;
   }
   return html + `<p class="hint"><span class="up">■ Rút khỏi sàn</span> (thường là gom về ví) · <span class="down">■ Nạp lên sàn</span> (thường để bán). Chạm cột để xem số.</p>
-    <p class="muted small">Tổng mọi sàn: Coin Metrics Community (CC BY-NC 4.0), số ngày hôm qua là số tạm tính. Từng sàn: số dư các ví sàn đã công khai, website tự chụp mỗi giờ (chuyển giữa ví sàn chưa theo dõi cũng bị tính là nạp/rút).</p>`;
+    <p class="muted small">Tổng mọi sàn: Coin Metrics Community (CC BY-NC 4.0), số liệu hôm qua là số tạm tính. Từng sàn: số dư các ví sàn đã công khai, website tự chụp mỗi giờ (chuyển giữa ví sàn chưa theo dõi cũng bị tính là nạp/rút).</p>`;
 }
 
 // ---------- 5. Quỹ ETF ----------
