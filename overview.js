@@ -244,7 +244,7 @@ function renderOvElliott(btc, focus) {
 function renderOvMarket(btc) {
   const lines = [];
   const mv = typeof mvrvState === 'function' ? mvrvState(ov.whales, btc) : null;
-  if (mv) lines.push(['📏', 'MVRV (giá ÷ giá vốn chung)', `<b class="${mv.m <= 1 ? 'up' : mv.m >= 2.3 ? 'down' : ''}">${mv.m.toFixed(2)}</b> <small class="muted">giá vốn ${ovPx(mv.real)} · gom ≤ 1 · chốt lời ≥ 2.3</small>`]);
+  if (mv) lines.push(['📏', 'MVRV (giá ÷ giá vốn chung)', `<b class="${mv.m <= 1 ? 'up' : mv.m >= 1.8 ? 'down' : ''}">${mv.m.toFixed(2)}</b> <small class="muted">giá vốn ${ovPx(mv.real)} · gom ≤ 1 · chốt lời 1.8–2.5</small>`]);
   if (ov.fng?.length) {
     const v = ov.fng[0].v, i = fngInfo(v);
     const ago = (k, l) => ov.fng[k] ? `${l} ${ov.fng[k].v}` : '';

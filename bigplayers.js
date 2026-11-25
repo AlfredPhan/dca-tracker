@@ -66,8 +66,10 @@ function bigCost(w, btc, sig) {
   const rows = [];
   const add = (p, name, tip, kind, date) => { if (p) rows.push({ p, name, tip, kind, date }); };
   if (real) {
-    add(real * 2.8, 'Vùng chốt lời mạnh (MVRV ~2.8)', 'Đỉnh 11/2021 (67.5K) có MVRV 2.85, đỉnh 3/2024 (73K) có MVRV 2.75', 'top');
-    add(real * 2.3, 'Vùng tay to bắt đầu chốt lời (MVRV ~2.3)', 'Đỉnh 10/2025 (124.8K) có MVRV 2.3: mỗi chu kỳ, MVRV ở đỉnh thấp dần', 'top');
+    add(real * 2.5, 'Mức chốt lời tối đa của kế hoạch (MVRV 2.5)', 'Cao hơn đỉnh MVRV chu kỳ 2025 (2.41): chốt nốt', 'top');
+    add(real * 2.3, 'Vùng chốt lời mạnh (MVRV 2.3)', 'Đỉnh 10/2025 (124.8K) có MVRV 2.29: mỗi chu kỳ, MVRV ở đỉnh thấp dần', 'top');
+    add(real * 2, 'Tay to bắt đầu chốt lời BTC (MVRV 2.0)', 'Dự kiến đỉnh chu kỳ này rơi vào MVRV 2.0–2.3', 'top');
+    add(real * 1.8, 'Bắt đầu chốt altcoin (MVRV 1.8)', 'Altcoin thường đạt đỉnh trước BTC', 'top');
   }
   add(bpLast(s.tmm)?.[1], 'Giá vốn nhà đầu tư đang hoạt động (True Market Mean)', 'Ranh giới thị trường tăng / giảm: giá trên mức này là thị trường tăng', 'mid', bpLast(s.tmm)?.[0]);
   add(bpLast(s.sth)?.[1], 'Giá vốn tay mới (giữ dưới 155 ngày)', 'Giá hồi lên đây thì tay mới hết lỗ, hay bán hòa vốn: kháng cự mạnh trong xu hướng giảm', 'res', bpLast(s.sth)?.[0]);
@@ -87,7 +89,7 @@ function bigCost(w, btc, sig) {
   let zone = '';
   if (mvrv) {
     const [txt, sc] = mvrv < 1 ? ['dưới giá vốn chung: vùng tay to gom mạnh trong lịch sử', 1] : mvrv < 1.5 ? ['gần giá vốn chung: vùng tích lũy, rủi ro thấp so với lịch sử', 1]
-      : mvrv < 2.3 ? ['vùng giữa, chưa rẻ cũng chưa đắt', 0] : ['vùng tay to hay chốt lời', -1];
+      : mvrv < 1.8 ? ['vùng giữa, chưa rẻ cũng chưa đắt', 0] : ['vùng chốt lời của kế hoạch (1.8–2.5)', -1];
     zone = `<p class="verdictline">MVRV hiện tại <b>${mvrv.toFixed(2)}</b>: ${txt}.</p>`;
     sig.push({ name: 'Giá so với giá vốn (MVRV)', score: sc, text: `MVRV ${mvrv.toFixed(2)}: ${txt}.` });
   }
@@ -107,7 +109,12 @@ const MVRV_TOPS = [
   ['11/2021', 67542, 2.85, 2.93], ['3/2024', 73082, 2.75, 2.78], ['12/2024', 106116, 2.68, 2.74], ['10/2025', 124824, 2.29, 2.41],
 ];
 const MVRV_BOTTOMS = [['1/2015', 176, 0.56], ['12/2018', 3185, 0.69], ['3/2020', 4959, 0.88], ['11/2022', 15758, 0.75]];
-const MVRV_BUY = [1, 0.9, 0.8], MVRV_SELL = [2.3, 2.8];
+const MVRV_BUY = [1, 0.9, 0.8], MVRV_SELL = [1.8, 1.9, 2, 2.1, 2.2, 2.3, 2.4, 2.5];
+// Lời khuyên theo mốc chốt lời (giống bot).
+const mvrvSellNote = (L) => L < 2 ? 'vùng chốt altcoin (alt thường đạt đỉnh trước BTC): chốt dần 30–50% alt, BTC vẫn giữ.'
+  : L < 2.3 ? 'tay to bắt đầu chốt lời BTC (dự kiến đỉnh chu kỳ này 2.0–2.3): chốt BTC từng phần, chốt phần lớn alt.'
+  : L < 2.5 ? 'vùng chốt lời mạnh (đỉnh 10/2025: 2.29–2.41): chốt mạnh BTC, alt nên chốt xong.'
+  : 'mức tối đa của kế hoạch, đã vượt đỉnh MVRV 2025: chốt nốt.';
 
 // Giá vốn chung, MVRV hiện tại và cảnh báo (dùng cho cả tab Tay to và trang Tổng quan).
 function mvrvState(w, btc) {
@@ -124,8 +131,7 @@ function mvrvState(w, btc) {
   }
   let alert = null;
   if (div) alert = { cls: 'down', icon: '⚠️', text: `Giá lập đỉnh mới (${BP_FMT(div.last.p)}) nhưng MVRV ${div.last.mvrv.toFixed(2)} thấp hơn mức ${div.top.mvrv.toFixed(2)} ngày ${bpDate(div.top.d)}: tay to có thể đang chốt lời dần. Nên chốt lời từng phần.` };
-  else if (m >= MVRV_SELL[1]) alert = { cls: 'down', icon: '🔴', text: `MVRV ${m.toFixed(2)}: vùng chốt lời mạnh (đỉnh 11/2021: 2.85, 3/2024: 2.75). Cân nhắc chốt lời một phần.` };
-  else if (m >= MVRV_SELL[0]) alert = { cls: 'down', icon: '🔴', text: `MVRV ${m.toFixed(2)}: vùng tay to bắt đầu chốt lời (đỉnh 10/2025: 2.29). Cân nhắc chốt lời một phần.` };
+  else if (m >= MVRV_SELL[0]) { const L = MVRV_SELL.filter((x) => m >= x).at(-1); alert = { cls: 'down', icon: '🔴', text: `MVRV ${m.toFixed(2)} (đã qua mốc ${L}): ${mvrvSellNote(L)}` }; }
   else if (m <= MVRV_BUY[2]) alert = { cls: 'up', icon: '🟢', text: `MVRV ${m.toFixed(2)}: vùng đáy sâu của lịch sử (đáy 2018: 0.69, 2022: 0.75). Mua phần BTC cuối, kiên nhẫn: giá có thể nằm vùng này vài tháng.` };
   else if (m <= MVRV_BUY[1]) alert = { cls: 'up', icon: '🟢', text: `MVRV ${m.toFixed(2)}: giá thấp hơn giá vốn chung hơn 10%, vùng tay to gom mạnh (đáy 2020: 0.88, 2022: 0.75).` };
   else if (m <= MVRV_BUY[0]) alert = { cls: 'up', icon: '🟢', text: `MVRV ${m.toFixed(2)}: giá dưới giá vốn chung ${BP_FMT(real)}, đa số người giữ đang lỗ. Lịch sử là vùng tay to gom.` };

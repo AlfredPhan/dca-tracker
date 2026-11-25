@@ -1,5 +1,5 @@
 // Cảnh báo MVRV của BTC (giá hiện tại ÷ giá vốn trung bình của mọi người đang giữ BTC).
-// Cấu hình trong wrangler.toml: MVRV_ALERT = "mức_gom,...:mức_chốt_lời,..." (VD "1,0.9:2.3,2.8"). Đặt "0" để tắt.
+// Cấu hình trong wrangler.toml: MVRV_ALERT = "mức_gom,...:mức_chốt_lời,..." (VD "1,0.9:1.8,2,2.3"). Đặt "0" để tắt.
 //   Giá giảm tới MVRV mức gom  -> vùng tay to gom trong lịch sử (đáy 2015: 0.56, 2018: 0.69, 2022: 0.75).
 //   Giá tăng tới MVRV mức chốt -> vùng tay to chốt lời (đỉnh 11/2021: 2.85, 3/2024: 2.75, 10/2025: 2.29).
 //   Phân kỳ: giá đóng cửa ngày cao nhất 365 ngày nhưng MVRV thấp hơn đỉnh MVRV trước đó -> tay to có thể đang xả dần.
@@ -10,6 +10,12 @@ const DAY = 86400e3;
 const CM = 'https://community-api.coinmetrics.io/v4/timeseries/asset-metrics';
 const HEAD = '📏 <b>MVRV BTC</b>';
 const fmt = (p) => '$' + Math.round(p).toLocaleString('en-US');
+// Lời khuyên theo từng mốc chốt lời (đỉnh MVRV thấp dần qua mỗi chu kỳ, chu kỳ này dự kiến 2.0–2.3).
+const sellNote = (L) => L < 2
+  ? 'Vùng <b>chốt altcoin</b>: altcoin thường đạt đỉnh trước BTC, nên chốt dần alt (30–50%), BTC vẫn giữ.'
+  : L < 2.3 ? 'Vùng tay to <b>bắt đầu chốt lời BTC</b> (dự kiến đỉnh chu kỳ này 2.0–2.3). Chốt BTC từng phần, chốt phần lớn altcoin còn lại.'
+  : L < 2.5 ? 'Vùng <b>chốt lời mạnh</b>: đỉnh 10/2025 có MVRV 2.29–2.41. Chốt mạnh BTC, altcoin nên chốt xong.'
+  : '<b>Mức tối đa của kế hoạch</b>: đã vượt đỉnh MVRV chu kỳ 2025 (2.41). Chốt nốt, phần còn lại là lộc.';
 
 export function parseMvrv(s) {
   const [a, b] = String(s || '').split(':');
@@ -147,8 +153,8 @@ export async function mvrvCheck({ storage, getJson, host, end, cfgStr }) {
     if (st.sent[k]) { if (last / st.real < L - 0.2) delete st.sent[k]; continue; }
     if (high >= p) {
       st.sent[k] = 1;
-      lines.push(`🔴 BTC lên <b>MVRV ${L}</b> ≈ ${fmt(p)}: giá gấp ${L} lần giá vốn trung bình, người giữ đang lãi lớn.\n` +
-        `Lịch sử đây là <b>vùng tay to chốt lời</b> (đỉnh 11/2021: 2.85 · 3/2024: 2.75 · 12/2024: 2.68 · 10/2025: 2.29). Cân nhắc <b>chốt lời một phần</b>.`);
+      lines.push(`🔴 BTC lên <b>MVRV ${L}</b> ≈ ${fmt(p)}: giá gấp ${L} lần giá vốn trung bình, người giữ đang lãi lớn.\n${sellNote(L)}\n` +
+        `<i>Đỉnh MVRV thấp dần: 3.96 (2021) → 2.75 (2024) → 2.41 (2025).</i>`);
     }
   }
   if (lines.length) out.push(`${HEAD}\n${lines.join('\n\n')}\n<i>Giá vốn trung bình ${fmt(st.real)} (Coin Metrics)</i>`);
