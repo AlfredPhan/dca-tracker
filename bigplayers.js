@@ -37,6 +37,7 @@ function renderBig() {
   const sig = [];
   $('#bigCost').innerHTML = bigCost(whales, btc, sig);
   $('#bigMvrv').innerHTML = bigMvrv(whales, btc);
+  $('#bigEthMvrv').innerHTML = bigEthMvrv(whales, prices.ETH);
   $('#bigWallets').innerHTML = bigWallets(whales, sig);
   $('#bigFlows').innerHTML = bigFlows(whales, onchain, sig);
   $('#bigEtf').innerHTML = bigEtf(etf, sig);
@@ -189,6 +190,38 @@ function bigMvrv(w, btc) {
     <p class="hint">💡 <b>MVRV ở đỉnh thấp dần</b> qua mỗi chu kỳ (5.9 → 4.7 → 3.96 → 2.85 → 2.29): đừng chờ con số của chu kỳ trước.
       <b>Tay to chốt lời trước đỉnh giá</b>: MVRV thường cao nhất trước đỉnh giá vài tuần đến vài tháng, nên giá lập đỉnh mới mà MVRV thấp hơn là dấu hiệu họ đang xả dần.</p>
     <p class="muted small">MVRV = giá BTC ÷ giá vốn trung bình của mọi người đang giữ (${BP_FMT(s.real)}, Coin Metrics ngày ${bpDate(s.day)}). Bảng tính theo giá đóng cửa ngày. Bot Telegram cũng báo khi chạm các vùng này và khi có phân kỳ.</p>`;
+}
+
+// ---------- MVRV ETH (tham khảo phụ, BTC là chính) ----------
+// Số liệu giá đóng cửa ngày, Coin Metrics (tra lại 25/11/2026). Đỉnh MVRV của ETH thấp dần còn nhanh hơn BTC.
+const ETH_TOPS = [['1/2018', 1380, 2.61], ['5/2021', 4156, 2.27], ['11/2021', 4811, 2.03], ['3/2024', 4073, 1.59], ['12/2024', 4013, 1.45], ['8/2025', 4831, 1.49]];
+const ETH_BOTTOMS = [['12/2018', 83, 0.30], ['3/2020', 110, 0.51], ['6/2022', 993, 0.60], ['4/2025', 1471, 0.79], ['6/2026', 1565, 0.76]];
+function bigEthMvrv(w, live) {
+  const head = '<h2>⟠ MVRV ETH <span class="muted small">(tham khảo phụ, BTC vẫn là chính)</span></h2>';
+  const rows = (w?.cm?.eth || []).filter((x) => x.mvrv && x.p);
+  if (!rows.length) return head + '<p class="hint">Chưa có dữ liệu.</p>';
+  const last = rows[rows.length - 1], real = last.p / last.mvrv, px = live || last.p, m = px / real;
+  const [txt, cl] = m < 0.8 ? ['vùng đáy sâu của lịch sử ETH', 'up'] : m < 1 ? ['dưới giá vốn chung, đa số người giữ ETH đang lỗ: vùng tay to hay gom', 'up']
+    : m < 1.45 ? ['vùng giữa', ''] : ['vùng các đỉnh gần đây của ETH (1.45–1.6): cân nhắc chốt lời', 'down'];
+  // Thanh MVRV 0 → 3: xanh là vùng đáy lịch sử, đỏ là vùng đỉnh, ▼ là hiện tại.
+  const pos = (v) => Math.min(100, Math.max(0, (v / 3) * 100)).toFixed(1) + '%';
+  const tick = (v, t) => `<span class="mvtick" style="left:${pos(v)}">${t}</span>`;
+  return head + `
+    <div class="ethmv">
+      <div><div class="ethnum ${cl}">${m.toFixed(2)}</div><small class="muted">ETH ${BP_FMT(px)} · giá vốn ${BP_FMT(real)}</small></div>
+      <div class="mvscale">
+        <div class="mvbar"><span class="mvnowmk" style="left:${pos(m)}"></span></div>
+        <div class="mvticks">${tick(0.3, '0.3')}${tick(0.8, '0.8')}${tick(1, '1')}${tick(1.5, '1.5')}${tick(2, '2')}${tick(2.6, '2.6')}</div>
+      </div>
+    </div>
+    <p class="verdictline ${cl}">${txt}.</p>
+    <div class="mvzones">
+      <span>🟢 Đáy</span><div class="zchips">${ETH_BOTTOMS.map(([d, p, v]) => `<span class="zchip"><small>${d}</small> <b>${v.toFixed(2)}</b></span>`).join('')}</div>
+      <span>🔴 Đỉnh</span><div class="zchips">${ETH_TOPS.map(([d, p, v]) => `<span class="zchip"><small>${d}</small> <b>${v.toFixed(2)}</b></span>`).join('')}</div>
+    </div>
+    <p class="hint">💡 ETH yếu hơn BTC: đỉnh MVRV giảm từ 2.6 xuống chỉ còn ~1.5 ở 2 lần đỉnh gần nhất, trong khi BTC vẫn lên được 2.3–2.4.
+      Dùng ETH để xem <b>altcoin đang rẻ hay đắt</b>; còn quyết định mua bán chính vẫn theo MVRV của BTC.</p>
+    <p class="muted small">Coin Metrics, giá vốn ngày ${bpDate(last.d)}${live ? '' : ' · giá ETH là giá đóng cửa ngày đó'}.</p>`;
 }
 
 // ---------- 3. Ví cá voi ----------

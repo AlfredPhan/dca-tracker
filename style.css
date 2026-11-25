@@ -408,3 +408,13 @@ tr.mvnow td { background: color-mix(in srgb, var(--accent) 14%, transparent); fo
 .mvstep.on span { color: var(--text); }
 .mvstep.done { opacity: .85; border-style: dashed; }
 @media (max-width: 760px) { .mvsteps { grid-template-columns: 1fr 1fr; } }
+/* MVRV ETH: số lớn + thanh 0 → 3 */
+.ethmv { display: grid; grid-template-columns: auto 1fr; gap: 16px; align-items: center; }
+.ethnum { font-size: 1.8rem; font-weight: 700; line-height: 1.1; }
+.mvscale { min-width: 0; }
+.mvbar { position: relative; height: 10px; border-radius: 999px;
+  background: linear-gradient(90deg, var(--up) 0%, var(--up) 26.7%, color-mix(in srgb, var(--muted) 35%, transparent) 26.7%, color-mix(in srgb, var(--muted) 35%, transparent) 48%, var(--down) 48%, var(--down) 100%); opacity: .85; }
+.mvnowmk { position: absolute; top: -5px; width: 4px; height: 20px; margin-left: -2px; border-radius: 2px; background: var(--text); box-shadow: 0 0 0 2px var(--card, var(--bg)); }
+.mvticks { position: relative; height: 16px; font-size: .72rem; color: var(--muted); margin-top: 4px; }
+.mvtick { position: absolute; transform: translateX(-50%); }
+@media (max-width: 480px) { .ethmv { grid-template-columns: 1fr; gap: 8px; } }
