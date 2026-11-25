@@ -86,7 +86,7 @@ function bigCost(w, btc, sig) {
   for (const r of rows) {
     if (!placed && btc > r.p) { html += nowRow; placed = true; }
     html += `<div class="ewrow ${r.kind === 'top' ? 'inv' : r.kind === 'sup' ? 'tgt' : 'alt'}"><span>${BP_FMT(r.p)}</span>
-      <span><b>${r.name}</b><br><small class="muted">${r.tip}${r.date ? ` · số ngày ${bpDate(r.date)}` : ''}</small></span>
+      <span><b>${r.name}</b><br><small class="muted">${r.tip}${r.date ? ` · số liệu ngày ${bpDate(r.date)}` : ''}</small></span>
       <span class="muted">${btc ? bpPct((r.p / btc - 1) * 100) : ''}</span></div>`;
   }
   if (!placed) html += nowRow;
