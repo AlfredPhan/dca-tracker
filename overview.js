@@ -247,6 +247,8 @@ function renderOvMarket(btc) {
   const mv = typeof mvrvState === 'function' ? mvrvState(ov.whales, btc) : null;
   if (mv) lines.push(['📏', 'MVRV (giá ÷ giá vốn chung)', `<b class="${mv.m <= 1 ? 'up' : mv.m >= 1.8 ? 'down' : ''}">${mv.m.toFixed(2)}</b> <small class="muted">giá vốn ${ovPx(mv.real)} · gom ≤ 1 · chốt lời 1.8–2.5</small>`]);
   const wm = typeof wmaState === 'function' ? wmaState(btc) : null;
+  // Lần tải đầu, overview.js chạy trước bigplayers.js nên chưa có nến tuần: tải rồi vẽ lại một lần.
+  if (!wm && typeof bpWeekly === 'function' && !ov.wkTried) { ov.wkTried = true; bpWeekly().then(() => renderOverview()).catch(() => {}); }
   if (wm) lines.push(['📉', 'Đường trung bình 200 tuần', `<b class="${wm.price < wm.wma ? 'up' : ''}">${ovPx(wm.wma)}</b> <small class="muted">giá ${wm.price < wm.wma ? 'dưới' : 'trên'} ${bpPct((wm.price / wm.wma - 1) * 100)} · dưới đường này là vùng gom dài hạn</small>`]);
   if (typeof cycleState === 'function') {
     const cs = cycleState();
