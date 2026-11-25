@@ -25,7 +25,7 @@ async function startBig() {
     $('#tab-big').addEventListener('click', (e) => { const go = e.target.closest('[data-go]'); if (go) goTab(go.dataset.go); });
   }
   const get = (n) => loadData(n).catch(() => null);
-  const [whales, onchain, etf, history] = await Promise.all([get('whales.json'), get('onchain.json'), get('etf.json'), get('history.json')]);
+  const [whales, onchain, etf, history] = await Promise.all([get('whales.json'), get('onchain.json'), get('etf.json'), get('history.json'), bpWeekly().catch(() => null)]);
   bp.data = { whales, onchain, etf, history };
   renderBig();
 }
@@ -38,6 +38,7 @@ function renderBig() {
   $('#bigCost').innerHTML = bigCost(whales, btc, sig);
   $('#bigMvrv').innerHTML = bigMvrv(whales, btc);
   $('#bigEthMvrv').innerHTML = bigEthMvrv(whales, prices.ETH);
+  $('#bigCycle').innerHTML = bigCycle(btc);
   $('#bigWallets').innerHTML = bigWallets(whales, sig);
   $('#bigFlows').innerHTML = bigFlows(whales, onchain, sig);
   $('#bigEtf').innerHTML = bigEtf(etf, sig);
@@ -72,6 +73,8 @@ function bigCost(w, btc, sig) {
     add(real * 2, 'Tay to bắt đầu chốt lời BTC (MVRV 2.0)', 'Dự kiến đỉnh chu kỳ này rơi vào MVRV 2.0–2.3', 'top');
     add(real * 1.8, 'Bắt đầu chốt altcoin (MVRV 1.8)', 'Altcoin thường đạt đỉnh trước BTC', 'top');
   }
+  const wm = wmaState(btc);
+  if (wm) add(wm.wma, 'Đường trung bình 200 tuần', 'Đáy 2015, 2018, 2020 quanh đường này; 2022 thủng sâu 34%. Đóng tuần lại trên đường này là dấu hiệu thị trường hồi phục', btc < wm.wma ? 'res' : 'sup');
   add(bpLast(s.tmm)?.[1], 'Giá vốn nhà đầu tư đang hoạt động (True Market Mean)', 'Ranh giới thị trường tăng / giảm: giá trên mức này là thị trường tăng', 'mid', bpLast(s.tmm)?.[0]);
   add(bpLast(s.sth)?.[1], 'Giá vốn tay mới (giữ dưới 155 ngày)', 'Giá hồi lên đây thì tay mới hết lỗ, hay bán hòa vốn: kháng cự mạnh trong xu hướng giảm', 'res', bpLast(s.sth)?.[0]);
   add(real, 'Giá vốn toàn thị trường (Realized Price)', 'Giá về gần mức này thường là vùng đáy chu kỳ (2015, 2018, 2022), tay to hay gom', 'sup', lastCm?.d || bpLast(s.real)?.[0]);
@@ -222,6 +225,76 @@ function bigEthMvrv(w, live) {
     <p class="hint">💡 ETH yếu hơn BTC: đỉnh MVRV giảm từ 2.6 xuống chỉ còn ~1.5 ở 2 lần đỉnh gần nhất, trong khi BTC vẫn lên được 2.3–2.4.
       Dùng ETH để xem <b>altcoin đang rẻ hay đắt</b>; còn quyết định mua bán chính vẫn theo MVRV của BTC.</p>
     <p class="muted small">Coin Metrics, giá vốn ngày ${bpDate(last.d)}${live ? '' : ' · giá ETH là giá đóng cửa ngày đó'}.</p>`;
+}
+
+// ---------- Chu kỳ halving + đường trung bình 200 tuần ----------
+// Nến tuần BTCUSDT của Binance (từ 2017), tải mỗi giờ. Dùng chung cho tab Tay to và trang Tổng quan.
+const bpWk = { at: 0, k: null, p: null };
+function bpWeekly() {
+  if (bpWk.k && Date.now() - bpWk.at < 3600e3) return Promise.resolve(bpWk.k);
+  if (!bpWk.p) bpWk.p = getJson('https://data-api.binance.vision/api/v3/klines?symbol=BTCUSDT&interval=1w&limit=320')
+    .then((k) => { bpWk.k = k.map((x) => ({ t: x[0], c: +x[4] })); bpWk.at = Date.now(); return bpWk.k; })
+    .finally(() => { bpWk.p = null; });
+  return bpWk.p;
+}
+const CYC_TOP = Date.parse('2025-10-06'), DAY_MS = 864e5, MON = 30.44;
+function wmaState(btc) {
+  const k = bpWk.k;
+  if (!k || k.length < 210) return null;
+  const c = k.map((x) => x.c), n = c.length - 1;
+  if (btc) c[n] = btc; // nến tuần hiện tại: dùng giá trực tiếp
+  const w = (i) => c.slice(i - 199, i + 1).reduce((a, b) => a + b, 0) / 200;
+  let below = 0; // số nến tuần đã đóng dưới đường 200 tuần kể từ đỉnh 10/2025
+  for (let i = 199; i < n; i++) if (k[i].t >= CYC_TOP && c[i] < w(i)) below++;
+  return { wma: w(n), price: c[n], below };
+}
+// Mốc của các chu kỳ (giá đóng cửa ngày, Coin Metrics; đáy 2026 là giá thấp nhất trong ngày, chưa xác nhận).
+const CYCLES = [
+  { n: '2012–2016', h: '2012-11-28', top: '2013-12-04', tp: 1135, bot: '2015-01-14', bp: 176, wm: -9, next: '2016-07-09' },
+  { n: '2016–2020', h: '2016-07-09', top: '2017-12-16', tp: 19641, bot: '2018-12-15', bp: 3185, wm: 0, next: '2020-05-11' },
+  { n: '2020–2024', h: '2020-05-11', top: '2021-11-08', tp: 67542, bot: '2022-11-21', bp: 15778, wm: -34, next: '2024-04-20' },
+  { n: '2024–2028', h: '2024-04-20', top: '2025-10-06', tp: 124824, bot: '2026-11-21', bp: 55130, now: true, next: '2028-04-15' },
+];
+const cycMon = (a, b) => (Date.parse(b) - Date.parse(a)) / DAY_MS / MON;
+// Tóm tắt dùng cho trang Tổng quan.
+function cycleState() {
+  return { fromTop: (Date.now() - CYC_TOP) / DAY_MS / MON, toHalving: (Date.parse('2028-04-15') - Date.now()) / DAY_MS / MON };
+}
+function bigCycle(btc) {
+  const head = '<h2>⏳ Chu kỳ halving &amp; đường 200 tuần <span class="muted small">(đang ở đâu trong chu kỳ 4 năm)</span></h2>';
+  const cs = cycleState(), wm = wmaState(btc);
+  // Thanh thời gian: halving 4/2024 → cuối 2029.
+  const t0 = Date.parse('2024-04-20'), t1 = Date.parse('2029-12-31');
+  const x = (d) => Math.min(100, Math.max(0, ((typeof d === 'number' ? d : Date.parse(d)) - t0) / (t1 - t0) * 100)).toFixed(1) + '%';
+  const mk = (d, label, cl) => `<span class="cymk ${cl}" style="left:${x(d)}"><i></i><small>${label}</small></span>`;
+  const years = [2025, 2026, 2027, 2028, 2029].map((y) => `<span class="cyyr" style="left:${x(`${y}-01-01`)}">${y}</span>`).join('');
+  const bar = `<div class="cybar">
+      <span class="cyzone up" style="left:${x('2026-10-06')};width:calc(${x('2026-12-06')} - ${x('2026-10-06')})"></span>
+      <span class="cyzone down" style="left:${x('2029-04-15')};width:calc(${x('2029-10-15')} - ${x('2029-04-15')})"></span>
+      ${years}
+      ${mk('2024-04-20', 'Halving 4/2024', 'first')}${mk('2025-10-06', 'Đỉnh 126K', 'down')}${mk('2026-11-21', 'Đáy? 55.1K', 'up')}
+      ${mk('2028-04-15', 'Halving ~4/2028', '')}${mk(Date.now(), 'Hôm nay', 'now')}
+    </div>
+    <p class="cylegend small"><b class="muted">●</b> Halving 4/2024 · <b class="down">●</b> Đỉnh 126K (10/2025) · <b class="up">●</b> Đáy? 55.1K (11/2026) · <b>▮</b> Hôm nay · <b class="muted">●</b> Halving ~4/2028</p>
+    <p class="muted small">Xanh: khung đáy theo lịch sử (12–14 tháng sau đỉnh). Đỏ: khung đỉnh tiếp theo nếu chu kỳ 4 năm còn đúng (12–18 tháng sau halving, khoảng 4–10/2029).</p>`;
+  const rows = CYCLES.map((c) => `<tr class="${c.now ? 'mvnow' : ''}"><td>${c.n}</td>
+      <td>${cycMon(c.h, c.top).toFixed(0)} tháng <small class="muted">${BP_FMT(c.tp)}</small></td>
+      <td>${cycMon(c.top, c.bot).toFixed(1)} tháng <small class="muted">${BP_FMT(c.bp)}${c.now ? ' (tạm)' : ''}</small></td>
+      <td>${c.now ? (wm ? `<b>${bpPct((wm.price / wm.wma - 1) * 100, 0)}</b> <small class="muted">hiện tại</small>` : '—') : `${c.wm > 0 ? '+' : c.wm < 0 ? '−' : ''}${Math.abs(c.wm)}%`}</td>
+      <td>${c.now ? `~${cycMon(c.bot, c.next).toFixed(0)} tháng <small class="muted">dự kiến</small>` : `${cycMon(c.bot, c.next).toFixed(0)} tháng`}</td></tr>`).join('');
+  const wmLine = wm
+    ? `<p class="verdictline ${wm.price < wm.wma ? 'up' : ''}">Đường 200 tuần: <b>${BP_FMT(wm.wma)}</b>. Giá ${wm.price < wm.wma ? 'đang <b>dưới</b>' : 'đang trên'} đường này ${bpPct((wm.price / wm.wma - 1) * 100)}${wm.below ? `, đã ${wm.below} nến tuần đóng dưới kể từ đỉnh` : ''}.
+        ${wm.price < wm.wma ? 'Lịch sử: giá dưới đường 200 tuần là vùng gom dài hạn; đóng tuần trở lại trên đường này là dấu hiệu chu kỳ tăng mới.' : ''}</p>`
+    : '<p class="hint">Đang tải nến tuần…</p>';
+  return head + `
+    <p class="verdictline">Hôm nay là <b>tháng thứ ${cs.fromTop.toFixed(1)}</b> sau đỉnh 10/2025. Ba chu kỳ trước đáy đến sau 12–13.5 tháng, nên đáy 55.1K (21/11/2026) <b>khớp nhịp thời gian</b>. Còn khoảng ${cs.toHalving.toFixed(0)} tháng tới halving tiếp theo.</p>
+    ${wmLine}
+    ${bar}
+    <div class="tablewrap"><table>
+      <thead><tr><th>Chu kỳ</th><th>Halving → đỉnh</th><th>Đỉnh → đáy</th><th>Đáy so với đường 200 tuần</th><th>Đáy → halving sau</th></tr></thead>
+      <tbody>${rows}</tbody></table></div>
+    <p class="hint">💡 Nhịp thời gian rất đều, nhưng mỗi chu kỳ chỉ có 3–4 lần lặp lại nên đây là <b>xác suất, không phải chắc chắn</b>. Đáy chỉ coi là xác nhận khi có thêm: đóng tuần trên 66.1K, MVRV giữ trên 1 suốt 30 ngày, hoặc đóng tuần lại trên đường 200 tuần.</p>
+    <p class="muted small">Đường 200 tuần: trung bình giá đóng cửa 200 nến tuần BTCUSDT trên Binance, nến tuần hiện tại dùng giá trực tiếp. Mốc đỉnh, đáy theo giá đóng cửa ngày (Coin Metrics), riêng đáy 2026 là giá thấp nhất trong ngày. Ngày halving 2028 là ước tính.</p>`;
 }
 
 // ---------- 3. Ví cá voi ----------

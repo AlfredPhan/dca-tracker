@@ -418,3 +418,25 @@ tr.mvnow td { background: color-mix(in srgb, var(--accent) 14%, transparent); fo
 .mvticks { position: relative; height: 16px; font-size: .72rem; color: var(--muted); margin-top: 4px; }
 .mvtick { position: absolute; transform: translateX(-50%); }
 @media (max-width: 480px) { .ethmv { grid-template-columns: 1fr; gap: 8px; } }
+/* Chu kỳ halving: thanh thời gian 4/2024 → 2029 */
+.cybar { position: relative; height: 6px; margin: 34px 4px 30px; border-radius: 999px; background: var(--border); }
+.cyzone { position: absolute; top: -4px; height: 14px; border-radius: 4px; opacity: .35; }
+.cyzone.up { background: var(--up); } .cyzone.down { background: var(--down); }
+.cyyr { position: absolute; top: 12px; transform: translateX(-50%); font-size: .7rem; color: var(--muted); }
+.cyyr::before { content: ""; position: absolute; left: 50%; top: -12px; height: 6px; border-left: 1px solid var(--muted); opacity: .5; }
+.cymk { position: absolute; top: -3px; transform: translateX(-50%); display: grid; justify-items: center; }
+.cymk i { width: 12px; height: 12px; border-radius: 50%; background: var(--muted); border: 2px solid var(--card); }
+.cymk small { position: absolute; bottom: 16px; white-space: nowrap; font-size: .72rem; font-weight: 600; color: var(--muted); }
+.cymk.up i { background: var(--up); } .cymk.up small { color: var(--up); }
+.cymk.down i { background: var(--down); } .cymk.down small { color: var(--down); }
+.cymk.now i { background: var(--text); width: 4px; height: 22px; border-radius: 2px; margin-top: -5px; }
+.cymk.now small { bottom: auto; top: 26px; color: var(--text); }
+.cymk.first small { left: -4px; }
+.cybar { margin-bottom: 44px; }
+.cymk.now small { top: 34px; }
+.cylegend { display: none; margin: -20px 0 4px; }
+@media (max-width: 600px) {
+  .cymk small { display: none; }
+  .cybar { margin: 14px 4px 34px; }
+  .cylegend { display: block; margin-top: -12px; }
+}

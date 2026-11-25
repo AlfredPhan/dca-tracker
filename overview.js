@@ -21,6 +21,7 @@ async function ovLoad(force) {
   const [status, history, etf, onchain, calendar, unlocks, fng, whales] = await Promise.all([
     get('status.json'), get('history.json'), get('etf.json'), get('onchain.json'), get('calendar.json'), get('unlocks.json'),
     loadFng().catch(() => null), get('whales.json'),
+    typeof bpWeekly === 'function' ? bpWeekly().catch(() => null) : null, // bigplayers.js: nến tuần cho đường 200 tuần
   ]);
   Object.assign(ov, { status, history, etf, onchain, calendar, unlocks, fng, whales });
   renderOverview();
@@ -245,6 +246,12 @@ function renderOvMarket(btc) {
   const lines = [];
   const mv = typeof mvrvState === 'function' ? mvrvState(ov.whales, btc) : null;
   if (mv) lines.push(['📏', 'MVRV (giá ÷ giá vốn chung)', `<b class="${mv.m <= 1 ? 'up' : mv.m >= 1.8 ? 'down' : ''}">${mv.m.toFixed(2)}</b> <small class="muted">giá vốn ${ovPx(mv.real)} · gom ≤ 1 · chốt lời 1.8–2.5</small>`]);
+  const wm = typeof wmaState === 'function' ? wmaState(btc) : null;
+  if (wm) lines.push(['📉', 'Đường trung bình 200 tuần', `<b class="${wm.price < wm.wma ? 'up' : ''}">${ovPx(wm.wma)}</b> <small class="muted">giá ${wm.price < wm.wma ? 'dưới' : 'trên'} ${bpPct((wm.price / wm.wma - 1) * 100)} · dưới đường này là vùng gom dài hạn</small>`]);
+  if (typeof cycleState === 'function') {
+    const cs = cycleState();
+    lines.push(['⏳', 'Chu kỳ halving', `tháng thứ <b>${cs.fromTop.toFixed(1)}</b> sau đỉnh 10/2025 <small class="muted">· đáy các chu kỳ trước: 12–13.5 tháng sau đỉnh · halving sau ~4/2028</small>`]);
+  }
   if (ov.fng?.length) {
     const v = ov.fng[0].v, i = fngInfo(v);
     const ago = (k, l) => ov.fng[k] ? `${l} ${ov.fng[k].v}` : '';
