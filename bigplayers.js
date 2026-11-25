@@ -293,7 +293,7 @@ function bigCycle(btc) {
     <div class="tablewrap"><table>
       <thead><tr><th>Chu kỳ</th><th>Halving → đỉnh</th><th>Đỉnh → đáy</th><th>Đáy so với đường 200 tuần</th><th>Đáy → halving sau</th></tr></thead>
       <tbody>${rows}</tbody></table></div>
-    <p class="hint">💡 Nhịp thời gian rất đều, nhưng mỗi chu kỳ chỉ có 3–4 lần lặp lại nên đây là <b>xác suất, không phải chắc chắn</b>. Đáy chỉ coi là xác nhận khi có thêm: đóng tuần trên 66.1K, MVRV giữ trên 1 suốt 30 ngày, hoặc đóng tuần lại trên đường 200 tuần.</p>
+    <p class="hint">💡 Nhịp thời gian rất đều, nhưng mỗi chu kỳ chỉ có 3–4 lần lặp lại nên đây là <b>xác suất, không phải chắc chắn</b>. Đáy chỉ coi là xác nhận khi có thêm: nến tuần đóng trên 66.1K hoặc trên đường 200 tuần. Nếu MVRV thủng xuống dưới 1 (chu kỳ này chưa xảy ra), cần thêm: quay lại và giữ trên 1 suốt 30 ngày.</p>
     <p class="muted small">Đường 200 tuần: trung bình giá đóng cửa 200 nến tuần BTCUSDT trên Binance, nến tuần hiện tại dùng giá trực tiếp. Mốc đỉnh, đáy theo giá đóng cửa ngày (Coin Metrics), riêng đáy 2026 là giá thấp nhất trong ngày. Ngày halving 2028 là ước tính.</p>`;
 }
 
