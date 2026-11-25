@@ -237,7 +237,7 @@ function bpWeekly() {
     .finally(() => { bpWk.p = null; });
   return bpWk.p;
 }
-const CYC_TOP = Date.parse('2025-10-06'), DAY_MS = 864e5, MON = 30.44;
+const CYC_TOP = Date.parse('2025-10-06'), CYC_DAY = 864e5, CYC_MON = 30.44;
 function wmaState(btc) {
   const k = bpWk.k;
   if (!k || k.length < 210) return null;
@@ -255,10 +255,10 @@ const CYCLES = [
   { n: '2020–2024', h: '2020-05-11', top: '2021-11-08', tp: 67542, bot: '2022-11-21', bp: 15778, wm: -34, next: '2024-04-20' },
   { n: '2024–2028', h: '2024-04-20', top: '2025-10-06', tp: 124824, bot: '2026-11-21', bp: 55130, now: true, next: '2028-04-15' },
 ];
-const cycMon = (a, b) => (Date.parse(b) - Date.parse(a)) / DAY_MS / MON;
+const cycMon = (a, b) => (Date.parse(b) - Date.parse(a)) / CYC_DAY / CYC_MON;
 // Tóm tắt dùng cho trang Tổng quan.
 function cycleState() {
-  return { fromTop: (Date.now() - CYC_TOP) / DAY_MS / MON, toHalving: (Date.parse('2028-04-15') - Date.now()) / DAY_MS / MON };
+  return { fromTop: (Date.now() - CYC_TOP) / CYC_DAY / CYC_MON, toHalving: (Date.parse('2028-04-15') - Date.now()) / CYC_DAY / CYC_MON };
 }
 function bigCycle(btc) {
   const head = '<h2>⏳ Chu kỳ halving &amp; đường 200 tuần <span class="muted small">(đang ở đâu trong chu kỳ 4 năm)</span></h2>';
