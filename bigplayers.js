@@ -25,7 +25,7 @@ async function startBig() {
     $('#tab-big').addEventListener('click', (e) => { const go = e.target.closest('[data-go]'); if (go) goTab(go.dataset.go); });
   }
   const get = (n) => loadData(n).catch(() => null);
-  const [whales, onchain, etf, history] = await Promise.all([get('whales.json'), get('onchain.json'), get('etf.json'), get('history.json'), bpWeekly().catch(() => null)]);
+  const [whales, onchain, etf, history] = await Promise.all([get('whales.json'), get('onchain.json'), get('etf.json'), get('history.json'), bpWeekly().catch(() => null), nwLoad().catch(() => null)]);
   bp.data = { whales, onchain, etf, history };
   renderBig();
 }
@@ -39,6 +39,7 @@ function renderBig() {
   $('#bigMvrv').innerHTML = bigMvrv(whales, btc);
   $('#bigEthMvrv').innerHTML = bigEthMvrv(whales, prices.ETH);
   $('#bigCycle').innerHTML = bigCycle(btc);
+  $('#bigNatr').innerHTML = bigNatr(btc);
   $('#bigWallets').innerHTML = bigWallets(whales, sig);
   $('#bigFlows').innerHTML = bigFlows(whales, onchain, sig);
   $('#bigEtf').innerHTML = bigEtf(etf, sig);
@@ -295,6 +296,67 @@ function bigCycle(btc) {
       <tbody>${rows}</tbody></table></div>
     <p class="hint">💡 Nhịp thời gian rất đều, nhưng mỗi chu kỳ chỉ có 3–4 lần lặp lại nên đây là <b>xác suất, không phải chắc chắn</b>. Đáy chỉ coi là xác nhận khi có thêm: nến tuần đóng trên 66.1K hoặc trên đường 200 tuần. Nếu MVRV thủng xuống dưới 1 (chu kỳ này chưa xảy ra), cần thêm: quay lại và giữ trên 1 suốt 30 ngày.</p>
     <p class="muted small">Đường 200 tuần: trung bình giá đóng cửa 200 nến tuần BTCUSDT trên Binance, nến tuần hiện tại dùng giá trực tiếp. Mốc đỉnh, đáy theo giá đóng cửa ngày (Coin Metrics), riêng đáy 2026 là giá thấp nhất trong ngày. Ngày halving 2028 là ước tính.</p>`;
+}
+
+// ---------- NATR + Williams %R (dựng lại theo ý tưởng chỉ báo "Celasor Normalized ATR with Williams %R") ----------
+// Tác giả không công khai code nên đây là bản minh bạch theo đúng mô tả: tín hiệu đáy khi biến động cao (NATR ≥ 80) VÀ giá sát đáy (%R ≤ −80).
+//   Williams %R(13): giá đóng cửa nằm đâu giữa đỉnh và đáy 13 nến (0 = sát đỉnh, −100 = sát đáy). Khớp đúng số của TradingView.
+//   NATR: ATR (EMA 9 của biên độ nến) đặt vào thang 20–80 theo vị trí giữa mức thấp nhất và cao nhất của L nến (80 = biến động cao nhất L nến).
+//   Công thức này dò ra từ số trên TradingView: khớp vệt xanh 5/2/2026 (ngày) và 29/10/2026 (H4), lệch vài điểm do dữ liệu từng sàn khác nhau.
+const NW_TF = [
+  { k: '4h', name: 'H4', L: 100, lim: 400 },
+  { k: '1d', name: 'Ngày', L: 100, lim: 1000, main: true },
+  { k: '1w', name: 'Tuần', L: 100, lim: 400 },
+  { k: '1M', name: 'Tháng', L: 60, lim: 200 }, // Binance chỉ có từ 8/2017 nên khung tháng dùng 60 nến
+];
+const nw = { at: 0, data: null, p: null };
+function nwLoad() {
+  if (nw.data && Date.now() - nw.at < 10 * 60e3) return Promise.resolve(nw.data);
+  if (!nw.p) nw.p = Promise.all(NW_TF.map((tf) => getJson(`https://data-api.binance.vision/api/v3/klines?symbol=BTCUSDT&interval=${tf.k}&limit=${tf.lim}`)
+    .then((k) => nwCalc(k.map((x) => ({ t: x[0], h: +x[2], l: +x[3], c: +x[4] })), tf.L)).catch(() => null)))
+    .then((r) => { nw.data = r; nw.at = Date.now(); return r; })
+    .finally(() => { nw.p = null; });
+  return nw.p;
+}
+function nwCalc(b, L) {
+  const tr = b.map((x, i) => (i ? Math.max(x.h - x.l, Math.abs(x.h - b[i - 1].c), Math.abs(x.l - b[i - 1].c)) : x.h - x.l));
+  let a = null;
+  const atr = tr.map((x) => (a = a === null ? x : (2 / 10) * x + (8 / 10) * a)); // EMA 9
+  const out = [];
+  for (let i = L + 13; i < b.length; i++) {
+    const w = atr.slice(i - L + 1, i + 1), lo = Math.min(...w), hi = Math.max(...w), pr = hi > lo ? 20 + 60 * (atr[i] - lo) / (hi - lo) : 50;
+    const s = b.slice(i - 12, i + 1), hh = Math.max(...s.map((x) => x.h)), ll = Math.min(...s.map((x) => x.l));
+    const wr = hh > ll ? ((hh - b[i].c) / (hh - ll)) * -100 : -50;
+    out.push({ t: b[i].t, c: b[i].c, pr, wr, sig: pr >= 79.9 && wr <= -80 });
+  }
+  return out;
+}
+const nwState = (r) => r.sig ? ['up', '🟢 Tín hiệu đáy: biến động cao + giá sát đáy'] : r.wr <= -80 ? ['up', '🟠 Quá bán: giá sát đáy 13 nến'] : r.wr >= -20 ? ['down', 'Giá sát đỉnh 13 nến'] : ['', '⚪ Trung lập'];
+// Tín hiệu gần nhất (gộp các nến tín hiệu liền nhau thành một lần).
+function nwLastSig(rows) { for (let i = rows.length - 1; i >= 0; i--) if (rows[i].sig) { while (i > 0 && rows[i - 1].sig) i--; return rows[i]; } return null; }
+const nwDate = (t) => { const d = new Date(t + 7 * 3600e3); return `${String(d.getUTCDate()).padStart(2, '0')}/${String(d.getUTCMonth() + 1).padStart(2, '0')}/${d.getUTCFullYear()}`; };
+function bigNatr(btc) {
+  const head = '<h2>📶 NATR + Williams %R <span class="muted small">(chỉ báo bắt đáy của Celasor, dựng lại)</span></h2>';
+  if (!nw.data) return head + '<p class="hint">Đang tải nến từ Binance…</p>';
+  const rows = NW_TF.map((tf, i) => {
+    const r = nw.data[i];
+    if (!r?.length) return `<tr><td>${tf.name}</td><td colspan="4" class="muted">Không tải được</td></tr>`;
+    const now = r[r.length - 1], [cl, txt] = nwState(now), ls = nwLastSig(r);
+    return `<tr class="${tf.main ? 'mvnow' : ''}"><td><b>${tf.name}</b>${tf.main ? ' <small class="muted">khung chính</small>' : ''}</td>
+      <td class="${now.pr >= 79.9 ? 'up' : ''}"><b>${now.pr.toFixed(0)}</b></td><td class="${now.wr <= -80 ? 'up' : now.wr >= -20 ? 'down' : ''}"><b>${now.wr.toFixed(1)}</b></td>
+      <td class="${cl}">${txt}</td>
+      <td class="small">${ls ? `${nwDate(ls.t)} · ${BP_FMT(ls.c)}${btc ? ` <span class="${btc >= ls.c ? 'up' : 'down'}">(nay ${bpPct((btc / ls.c - 1) * 100, 0)})</span>` : ''}` : '<span class="muted">chưa có trong dữ liệu</span>'}</td></tr>`;
+  }).join('');
+  return head + `
+    <p class="hint">Vệt <b class="up">xanh lá</b> trên TradingView = <b>cả 2 điều kiện cùng lúc</b>: biến động cao nhất 100 nến (NATR chạm 80, thường là lúc bán tháo hoảng loạn) và giá đóng sát đáy 13 nến (%R ≤ −80). Đoạn đỏ chỉ là %R ≤ −80 (quá bán).</p>
+    <div class="tablewrap"><table>
+      <thead><tr><th>Khung</th><th>NATR (20–80)</th><th>Williams %R</th><th>Trạng thái</th><th>Tín hiệu đáy gần nhất</th></tr></thead>
+      <tbody>${rows}</tbody></table></div>
+    <p class="hint">💡 <b>Kiểm tra trên lịch sử</b> (Binance 8/2017–11/2026, bản dựng lại này):
+      <b>khung ngày hiệu quả nhất</b>: chỉ 6 lần tín hiệu (11/2018, 3/2020 Covid, 11/2022 FTX, 3/2024, 2/2026, 15/11/2026), cả 5 lần đã đủ 90 ngày đều có lãi (trung bình +38%), nhưng sau tín hiệu giá có thể giảm thêm 5–20% nên vẫn mua từng phần.
+      Khung H4 nhiều tín hiệu nhưng chỉ đúng khoảng 50/50. Khung tuần chỉ 3 lần. Khung tháng: %R dưới −80 trùng vùng đáy chu kỳ (2015, 2018, 2022).
+      Tín hiệu đáng tin hơn khi các chỉ báo lớn cùng báo rẻ (MVRV gần 1, giá dưới đường 200 tuần).</p>
+    <p class="muted small">Nến đang chạy nên số thay đổi đến khi nến đóng (nến ngày đóng 7:00 sáng giờ VN). Williams %R khớp TradingView. NATR so với 100 nến gần nhất (khung tháng 60 nến), dò công thức từ số trên TradingView vì tác giả không công khai code: có thể lệch vài điểm, và mỗi sàn có thể có hoặc không có vệt xanh khi NATR sát mức 80. Dữ liệu BTCUSDT Binance.</p>`;
 }
 
 // ---------- 3. Ví cá voi ----------

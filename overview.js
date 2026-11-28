@@ -250,6 +250,14 @@ function renderOvMarket(btc) {
   // Lần tải đầu, overview.js chạy trước bigplayers.js nên chưa có nến tuần: tải rồi vẽ lại một lần.
   if (!wm && typeof bpWeekly === 'function' && !ov.wkTried) { ov.wkTried = true; bpWeekly().then(() => renderOverview()).catch(() => {}); }
   if (wm) lines.push(['📉', 'Đường trung bình 200 tuần', `<b class="${wm.price < wm.wma ? 'up' : ''}">${ovPx(wm.wma)}</b> <small class="muted">giá ${wm.price < wm.wma ? 'dưới' : 'trên'} ${bpPct((wm.price / wm.wma - 1) * 100)} · dưới đường này là vùng gom dài hạn</small>`]);
+  // NATR + Williams %R khung ngày (bigplayers.js); lần đầu chưa có dữ liệu thì tải rồi vẽ lại.
+  if (typeof nwLoad === 'function') {
+    const d = nw.data?.[NW_TF.findIndex((t) => t.main)];
+    if (d?.length) {
+      const r = d[d.length - 1], [c, t] = nwState(r);
+      lines.push(['📶', 'NATR + Williams %R (ngày)', `<b class="${c}">${t}</b> <small class="muted">NATR ${r.pr.toFixed(0)} · %R ${r.wr.toFixed(1)} · chi tiết ở tab Tay to</small>`]);
+    } else if (!ov.nwTried) { ov.nwTried = true; nwLoad().then(() => renderOverview()).catch(() => {}); }
+  }
   if (typeof cycleState === 'function') {
     const cs = cycleState();
     lines.push(['⏳', 'Chu kỳ halving', `tháng thứ <b>${cs.fromTop.toFixed(1)}</b> sau đỉnh 10/2025 <small class="muted">· đáy các chu kỳ trước: 12–13.5 tháng sau đỉnh · halving sau ~4/2028</small>`]);
